@@ -3,10 +3,12 @@
 #include <memory>
 #include <random>
 #include <cmath>
+#include <chrono>
 #include <functional>
 #include <vector>
 #include <string>
 #include "../data_struct/HBStarTree.hpp"
+#include "../utils/TimeoutManager.hpp"
 
 class SimulatedAnnealing {
 private:
@@ -49,6 +51,11 @@ private:
     // Cost function weight parameters
     double areaWeight;
     double wirelengthWeight;
+
+    // Timeout related
+    chrono::steady_clock::time_point startTime;
+    chrono::seconds timeoutSeconds;
+    std::shared_ptr<TimeoutManager> timeoutManager;
     
     /**
      * Calculates the cost of a solution
@@ -169,4 +176,7 @@ public:
      * @param seed Random seed
      */
     void setSeed(unsigned int seed);
+
+    void setTimeoutManager(std::shared_ptr<TimeoutManager> manager);
+    bool checkTimeout() const;
 };

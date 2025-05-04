@@ -4,11 +4,21 @@
 #include <ctime>
 #include <limits>
 #include <cmath>
+#include <chrono>
+using namespace std;
+
+void SimulatedAnnealing::setTimeoutManager(shared_ptr<TimeoutManager> manager) {
+    timeoutManager = manager;
+}
+
+bool SimulatedAnnealing::checkTimeout() const {
+    return timeoutManager && timeoutManager->hasTimedOut();
+}
 
 /**
  * Constructor
  */
-SimulatedAnnealing::SimulatedAnnealing(std::shared_ptr<HBStarTree> initialSolution,
+SimulatedAnnealing::SimulatedAnnealing(shared_ptr<HBStarTree> initialSolution,
                                      double initialTemp,
                                      double finalTemp,
                                      double coolingRate,
@@ -32,10 +42,12 @@ SimulatedAnnealing::SimulatedAnnealing(std::shared_ptr<HBStarTree> initialSoluti
       rejectedMoves(0),
       noImprovementCount(0),
       areaWeight(1.0),
-      wirelengthWeight(0.0) {
+      wirelengthWeight(0.0),
+      startTime(chrono::steady_clock::now()),
+      timeoutSeconds(0) {
     
     // Initialize random number generator with current time
-    rng.seed(static_cast<unsigned int>(std::time(nullptr)));
+    rng.seed(static_cast<unsigned int>(time(nullptr)));
     
     // Pack initial solution to get valid coordinates and area
     currentSolution->pack();
@@ -83,7 +95,7 @@ void SimulatedAnnealing::setCostWeights(double area, double wirelength) {
 /**
  * Calculates the cost of a solution
  */
-int SimulatedAnnealing::calculateCost(const std::shared_ptr<HBStarTree>& solution) const {
+int SimulatedAnnealing::calculateCost(const shared_ptr<HBStarTree>& solution) const {
     // Area cost
     int areaCost = solution->getArea();
     
@@ -118,7 +130,7 @@ bool SimulatedAnnealing::perturb() {
  * Rotates a random module
  */
 bool SimulatedAnnealing::perturbRotate() {
-    std::string moduleName = selectRandomModule();
+    string moduleName = selectRandomModule();
     if (moduleName.empty()) return false;
     
     return currentSolution->rotateModule(moduleName);
@@ -128,8 +140,8 @@ bool SimulatedAnnealing::perturbRotate() {
  * Moves a random node to a new position
  */
 bool SimulatedAnnealing::perturbMove() {
-    std::string nodeName = selectRandomNode();
-    std::string newParentName = selectRandomNode();
+    string nodeName = selectRandomNode();
+    string newParentName = selectRandomNode();
     
     if (nodeName.empty() || newParentName.empty() || nodeName == newParentName) {
         return false;
@@ -145,8 +157,8 @@ bool SimulatedAnnealing::perturbMove() {
  * Swaps two random nodes
  */
 bool SimulatedAnnealing::perturbSwap() {
-    std::string nodeName1 = selectRandomNode();
-    std::string nodeName2 = selectRandomNode();
+    string nodeName1 = selectRandomNode();
+    string nodeName2 = selectRandomNode();
     
     if (nodeName1.empty() || nodeName2.empty() || nodeName1 == nodeName2) {
         return false;
@@ -159,13 +171,13 @@ bool SimulatedAnnealing::perturbSwap() {
  * Changes the representative of a symmetry pair in a random symmetry group
  */
 bool SimulatedAnnealing::perturbChangeRepresentative() {
-    std::string symmetryGroupName = selectRandomSymmetryGroup();
+    string symmetryGroupName = selectRandomSymmetryGroup();
     if (symmetryGroupName.empty()) return false;
     
     // Get a random module from the symmetry group
     const auto& symmetryGroups = currentSolution->getSymmetryGroups();
-    auto it = std::find_if(symmetryGroups.begin(), symmetryGroups.end(),
-                          [&symmetryGroupName](const std::shared_ptr<SymmetryGroup>& group) {
+    auto it = find_if(symmetryGroups.begin(), symmetryGroups.end(),
+                          [&symmetryGroupName](const shared_ptr<SymmetryGroup>& group) {
                               return group->getName() == symmetryGroupName;
                           });
     
@@ -175,11 +187,11 @@ bool SimulatedAnnealing::perturbChangeRepresentative() {
     
     // Choose a random symmetry pair
     const auto& pairs = (*it)->getSymmetryPairs();
-    std::uniform_int_distribution<int> pairDist(0, pairs.size() - 1);
+    uniform_int_distribution<int> pairDist(0, pairs.size() - 1);
     const auto& pair = pairs[pairDist(rng)];
     
     // Randomly choose one of the modules in the pair
-    std::string moduleName = (uniformDist(rng) < 0.5) ? pair.first : pair.second;
+    string moduleName = (uniformDist(rng) < 0.5) ? pair.first : pair.second;
     
     return currentSolution->changeRepresentative(symmetryGroupName, moduleName);
 }
@@ -188,7 +200,7 @@ bool SimulatedAnnealing::perturbChangeRepresentative() {
  * Converts the symmetry type of a random symmetry group
  */
 bool SimulatedAnnealing::perturbConvertSymmetryType() {
-    std::string symmetryGroupName = selectRandomSymmetryGroup();
+    string symmetryGroupName = selectRandomSymmetryGroup();
     if (symmetryGroupName.empty()) return false;
     
     return currentSolution->convertSymmetryType(symmetryGroupName);
@@ -197,35 +209,35 @@ bool SimulatedAnnealing::perturbConvertSymmetryType() {
 /**
  * Select a random module
  */
-std::string SimulatedAnnealing::selectRandomModule() const {
+string SimulatedAnnealing::selectRandomModule() const {
     const auto& modules = currentSolution->getModules();
     if (modules.empty()) return "";
     
     // Convert map to vector for random selection
-    std::vector<std::string> moduleNames;
+    vector<string> moduleNames;
     for (const auto& pair : modules) {
         moduleNames.push_back(pair.first);
     }
     
-    std::uniform_int_distribution<int> dist(0, moduleNames.size() - 1);
+    uniform_int_distribution<int> dist(0, moduleNames.size() - 1);
     return moduleNames[dist(rng)];
 }
 
 /**
  * Select a random symmetry group
  */
-std::string SimulatedAnnealing::selectRandomSymmetryGroup() const {
+string SimulatedAnnealing::selectRandomSymmetryGroup() const {
     const auto& symmetryGroups = currentSolution->getSymmetryGroups();
     if (symmetryGroups.empty()) return "";
     
-    std::uniform_int_distribution<int> dist(0, symmetryGroups.size() - 1);
+    uniform_int_distribution<int> dist(0, symmetryGroups.size() - 1);
     return symmetryGroups[dist(rng)]->getName();
 }
 
 /**
  * Select a random node (module or symmetry group)
  */
-std::string SimulatedAnnealing::selectRandomNode() const {
+string SimulatedAnnealing::selectRandomNode() const {
     // Decide whether to select a module or a symmetry group
     const auto& modules = currentSolution->getModules();
     const auto& symmetryGroups = currentSolution->getSymmetryGroups();
@@ -233,13 +245,13 @@ std::string SimulatedAnnealing::selectRandomNode() const {
     int totalNodes = modules.size() + symmetryGroups.size();
     if (totalNodes == 0) return "";
     
-    std::uniform_int_distribution<int> dist(0, totalNodes - 1);
+    uniform_int_distribution<int> dist(0, totalNodes - 1);
     int index = dist(rng);
     
     if (index < static_cast<int>(modules.size())) {
         // Select a module
         auto it = modules.begin();
-        std::advance(it, index);
+        advance(it, index);
         return it->first;
     } else {
         // Select a symmetry group
@@ -258,75 +270,98 @@ bool SimulatedAnnealing::acceptMove(int costDifference, double temperature) cons
     }
     
     // For moves that worsen the solution, accept with a probability based on temperature
-    double probability = std::exp(-costDifference / temperature);
+    double probability = exp(-costDifference / temperature);
     return uniformDist(rng) < probability;
 }
 
 /**
  * Runs the SA
  */
-std::shared_ptr<HBStarTree> SimulatedAnnealing::run() {
-    double temperature = initialTemperature;
-    
-    // Reset statistics
-    totalIterations = 0;
-    acceptedMoves = 0;
-    rejectedMoves = 0;
-    noImprovementCount = 0;
-    
-    // Main annealing loop
-    while (temperature > finalTemperature && noImprovementCount < noImprovementLimit) {
-        // Perform iterations at current temperature
-        for (int i = 0; i < iterationsPerTemperature; ++i) {
-            // Create a copy of the current solution
-            auto tempSolution = currentSolution->clone();
-            
-            // Perturb the temporary solution
-            bool perturbSuccess = perturb();
-            if (!perturbSuccess) {
-                continue;  // Skip this iteration if perturbation failed
+shared_ptr<HBStarTree> SimulatedAnnealing::run() {
+    try {
+        double temperature = initialTemperature;
+        
+        // Reset statistics
+        totalIterations = 0;
+        acceptedMoves = 0;
+        rejectedMoves = 0;
+        noImprovementCount = 0;
+        
+        // Main annealing loop
+        while (temperature > finalTemperature && noImprovementCount < noImprovementLimit) {
+            // Check for timeout
+            if (checkTimeout()) {
+                cout << "Timeout detected in SA algorithm. Returning best solution so far." << endl;
+                break;
             }
             
-            // Pack the solution to get updated coordinates and area
-            currentSolution->pack();
-            
-            // Calculate new cost
-            int newCost = calculateCost(currentSolution);
-            
-            // Decide whether to accept the move
-            int costDifference = newCost - currentCost;
-            if (acceptMove(costDifference, temperature)) {
-                // Accept the move
-                currentCost = newCost;
-                acceptedMoves++;
+            // Perform iterations at current temperature
+            for (int i = 0; i < iterationsPerTemperature; ++i) {
+                // Check for timeout periodically
+                if (i % 10 == 0 && checkTimeout()) {
+                    cout << "Timeout detected during iteration. Breaking loop." << endl;
+                    break;
+                }
                 
-                // Update best solution if improved
-                if (newCost < bestCost) {
-                    bestSolution = currentSolution->clone();
-                    bestCost = newCost;
-                    noImprovementCount = 0;
+                // Create a copy of the current solution
+                auto tempSolution = currentSolution->clone();
+                
+                // Perturb the temporary solution
+                bool perturbSuccess = perturb();
+                if (!perturbSuccess) {
+                    continue;  // Skip this iteration if perturbation failed
+                }
+                
+                // Pack the solution to get updated coordinates and area
+                currentSolution->pack();
+                
+                // Calculate new cost
+                int newCost = calculateCost(currentSolution);
+                
+                // Decide whether to accept the move
+                int costDifference = newCost - currentCost;
+                if (acceptMove(costDifference, temperature)) {
+                    // Accept the move
+                    currentCost = newCost;
+                    acceptedMoves++;
+                    
+                    // Update best solution if improved
+                    if (newCost < bestCost) {
+                        bestSolution = currentSolution->clone();
+                        bestCost = newCost;
+                        noImprovementCount = 0;
+                    } else {
+                        noImprovementCount++;
+                    }
                 } else {
+                    // Reject the move
+                    currentSolution = tempSolution;
+                    rejectedMoves++;
                     noImprovementCount++;
                 }
-            } else {
-                // Reject the move
-                currentSolution = tempSolution;
-                rejectedMoves++;
-                noImprovementCount++;
+                
+                totalIterations++;
             }
             
-            totalIterations++;
+            // Break from the outer loop too if timeout occurred
+            if (checkTimeout()) {
+                break;
+            }
+            
+            // Cool down
+            temperature *= coolingRate;
+            
+            // Print progress
+            cout << "Temperature: " << temperature 
+                    << ", Best cost: " << bestCost 
+                    << ", Current cost: " << currentCost 
+                    << ", No improvement: " << noImprovementCount 
+                    << endl;
         }
-        
-        // Cool down
-        temperature *= coolingRate;
-        
-        // Print progress
-        std::cout << "Temperature: " << temperature 
-                  << ", Best cost: " << bestCost 
-                  << ", Current cost: " << currentCost 
-                  << ", No improvement: " << noImprovementCount 
-                  << std::endl;
+    }
+    catch (const exception& e) {
+        cout << "Exception during SA: " << e.what() << endl;
+        cout << "Returning best solution found so far." << endl;
     }
     
     // Make sure the best solution is packed
@@ -336,7 +371,7 @@ std::shared_ptr<HBStarTree> SimulatedAnnealing::run() {
 }
 
 
-std::shared_ptr<HBStarTree> SimulatedAnnealing::getBestSolution() const {
+shared_ptr<HBStarTree> SimulatedAnnealing::getBestSolution() const {
     return bestSolution;
 }
 
@@ -347,8 +382,8 @@ int SimulatedAnnealing::getBestCost() const {
 /**
  * Gets statistics about the annealing process
  */
-std::map<std::string, int> SimulatedAnnealing::getStatistics() const {
-    std::map<std::string, int> stats;
+map<string, int> SimulatedAnnealing::getStatistics() const {
+    map<string, int> stats;
     stats["totalIterations"] = totalIterations;
     stats["acceptedMoves"] = acceptedMoves;
     stats["rejectedMoves"] = rejectedMoves;

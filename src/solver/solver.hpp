@@ -7,6 +7,7 @@
 #include "../data_struct/Module.hpp"
 #include "../data_struct/SymmetryConstraint.hpp"
 #include "../utils/SA.hpp"
+#include "../utils/TimeoutManager.hpp"
 
 /**
  * PlacementSolver class for solving the analog device placement problem
@@ -49,6 +50,8 @@ private:
     
     // Statistics
     int totalArea;
+
+    std::shared_ptr<TimeoutManager> timeoutManager;
     
     /**
      * Creates an initial placement solution
@@ -60,11 +63,9 @@ public:
      * Constructor
      */
     PlacementSolver();
-    
-    /**
-     * Destructor
-     */
     ~PlacementSolver();
+
+    void setTimeoutManager(std::shared_ptr<TimeoutManager> manager);
     
     /**
      * Loads modules and symmetry constraints
