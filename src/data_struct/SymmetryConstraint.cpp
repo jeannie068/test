@@ -3,14 +3,15 @@
 #include <algorithm>
 #include <cmath>
 #include <queue>
+using namespace std;
 
 // Constructor
-SymmetryGroup::SymmetryGroup(const std::string& name, SymmetryType type)
+SymmetryGroup::SymmetryGroup(const string& name, SymmetryType type)
     : name(name), type(type), axisPosition(-1) {}
 
 // Module management functions
-void SymmetryGroup::addSymmetryPair(const std::string& module1, const std::string& module2) {
-    symmetryPairs.push_back(std::make_pair(module1, module2));
+void SymmetryGroup::addSymmetryPair(const string& module1, const string& module2) {
+    symmetryPairs.push_back(make_pair(module1, module2));
     
     // Update lookup structures for O(1) access
     pairMap[module1] = module2;
@@ -19,7 +20,7 @@ void SymmetryGroup::addSymmetryPair(const std::string& module1, const std::strin
     allModules.insert(module2);
 }
 
-void SymmetryGroup::addSelfSymmetric(const std::string& module) {
+void SymmetryGroup::addSelfSymmetric(const string& module) {
     selfSymmetric.push_back(module);
     
     // Update lookup structures for O(1) access
@@ -28,27 +29,27 @@ void SymmetryGroup::addSelfSymmetric(const std::string& module) {
 }
 
 // Query functions with O(1) complexity
-bool SymmetryGroup::isInGroup(const std::string& moduleName) const {
+bool SymmetryGroup::isInGroup(const string& moduleName) const {
     return allModules.find(moduleName) != allModules.end();
 }
 
-bool SymmetryGroup::isSelfSymmetric(const std::string& moduleName) const {
+bool SymmetryGroup::isSelfSymmetric(const string& moduleName) const {
     return selfSymSet.find(moduleName) != selfSymSet.end();
 }
 
-bool SymmetryGroup::isSymmetryPair(const std::string& module1, const std::string& module2) const {
+bool SymmetryGroup::isSymmetryPair(const string& module1, const string& module2) const {
     auto it = pairMap.find(module1);
     return (it != pairMap.end() && it->second == module2);
 }
 
-std::string SymmetryGroup::getSymmetricPair(const std::string& moduleName) const {
+string SymmetryGroup::getSymmetricPair(const string& moduleName) const {
     auto it = pairMap.find(moduleName);
     return (it != pairMap.end()) ? it->second : "";
 }
 
 // Determine if modules form a connected symmetry island
-bool SymmetryGroup::isSymmetryIsland(const std::unordered_map<std::string, std::pair<int, int>>& positions,
-                                    const std::unordered_map<std::string, std::pair<int, int>>& dimensions) const {
+bool SymmetryGroup::isSymmetryIsland(const unordered_map<string, pair<int, int>>& positions,
+                                    const unordered_map<string, pair<int, int>>& dimensions) const {
     if (allModules.empty()) return true;
     
     // Check if all modules are present
@@ -60,8 +61,8 @@ bool SymmetryGroup::isSymmetryIsland(const std::unordered_map<std::string, std::
     }
     
     // Check connectivity using BFS
-    std::unordered_set<std::string> visited;
-    std::queue<std::string> queue;
+    unordered_set<string> visited;
+    queue<string> queue;
     
     // Start with the first module
     auto it = allModules.begin();
@@ -69,7 +70,7 @@ bool SymmetryGroup::isSymmetryIsland(const std::unordered_map<std::string, std::
     visited.insert(*it);
     
     // Helper lambda to check if two modules are adjacent
-    auto isAdjacent = [&](const std::string& m1, const std::string& m2) -> bool {
+    auto isAdjacent = [&](const string& m1, const string& m2) -> bool {
         const auto& pos1 = positions.at(m1);
         const auto& pos2 = positions.at(m2);
         const auto& dim1 = dimensions.at(m1);
@@ -98,7 +99,7 @@ bool SymmetryGroup::isSymmetryIsland(const std::unordered_map<std::string, std::
     
     // BFS to check connectivity
     while (!queue.empty()) {
-        std::string current = queue.front();
+        string current = queue.front();
         queue.pop();
         
         for (const auto& module : allModules) {
@@ -114,15 +115,15 @@ bool SymmetryGroup::isSymmetryIsland(const std::unordered_map<std::string, std::
 }
 
 // Getters
-std::string SymmetryGroup::getName() const {
+string SymmetryGroup::getName() const {
     return name;
 }
 
-const std::vector<std::pair<std::string, std::string>>& SymmetryGroup::getSymmetryPairs() const {
+const vector<pair<string, string>>& SymmetryGroup::getSymmetryPairs() const {
     return symmetryPairs;
 }
 
-const std::vector<std::string>& SymmetryGroup::getSelfSymmetric() const {
+const vector<string>& SymmetryGroup::getSelfSymmetric() const {
     return selfSymmetric;
 }
 
@@ -146,7 +147,7 @@ double SymmetryGroup::getAxisPosition() const {
     return axisPosition;
 }
 
-const std::unordered_set<std::string>& SymmetryGroup::getAllModules() const {
+const unordered_set<string>& SymmetryGroup::getAllModules() const {
     return allModules;
 }
 
@@ -166,8 +167,8 @@ void SymmetryGroup::changeSymmetryType() {
 
 // Validation and utility functions
 bool SymmetryGroup::validateSymmetricPlacement(
-    const std::unordered_map<std::string, std::pair<int, int>>& positions,
-    const std::unordered_map<std::string, std::pair<int, int>>& dimensions) const {
+    const unordered_map<string, pair<int, int>>& positions,
+    const unordered_map<string, pair<int, int>>& dimensions) const {
     
     // Calculate symmetry axis if not set
     double axis = (axisPosition < 0) ? calculateAxisPosition(positions) : axisPosition;
@@ -198,14 +199,14 @@ bool SymmetryGroup::validateSymmetricPlacement(
         
         if (type == SymmetryType::VERTICAL) {
             // For vertical symmetry: x1 + x2 = 2*axis, y1 = y2
-            if (std::abs(center1_x + center2_x - 2*axis) > 1e-6 || 
-                std::abs(center1_y - center2_y) > 1e-6) {
+            if (abs(center1_x + center2_x - 2*axis) > 1e-6 || 
+                abs(center1_y - center2_y) > 1e-6) {
                 return false;
             }
         } else { // HORIZONTAL
             // For horizontal symmetry: y1 + y2 = 2*axis, x1 = x2
-            if (std::abs(center1_y + center2_y - 2*axis) > 1e-6 || 
-                std::abs(center1_x - center2_x) > 1e-6) {
+            if (abs(center1_y + center2_y - 2*axis) > 1e-6 || 
+                abs(center1_x - center2_x) > 1e-6) {
                 return false;
             }
         }
@@ -229,12 +230,12 @@ bool SymmetryGroup::validateSymmetricPlacement(
         
         if (type == SymmetryType::VERTICAL) {
             // For vertical symmetry, center x should be on the axis
-            if (std::abs(center_x - axis) > 1e-6) {
+            if (abs(center_x - axis) > 1e-6) {
                 return false;
             }
         } else { // HORIZONTAL
             // For horizontal symmetry, center y should be on the axis
-            if (std::abs(center_y - axis) > 1e-6) {
+            if (abs(center_y - axis) > 1e-6) {
                 return false;
             }
         }
@@ -243,7 +244,7 @@ bool SymmetryGroup::validateSymmetricPlacement(
     return true;
 }
 
-double SymmetryGroup::calculateAxisPosition(const std::unordered_map<std::string, std::pair<int, int>>& positions) const {
+double SymmetryGroup::calculateAxisPosition(const unordered_map<string, pair<int, int>>& positions) const {
     if (symmetryPairs.empty() && selfSymmetric.empty()) {
         return -1.0; // No modules to calculate axis
     }

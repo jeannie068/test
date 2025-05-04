@@ -12,52 +12,44 @@
 #include <iostream>
 #include <limits>
 #include <stack>
+using namespace std;
 
 /**
  * Constructor
  */
 HBStarTree::HBStarTree()
     : root(nullptr),
-      horizontalContour(std::make_shared<Contour>()),
-      verticalContour(std::make_shared<Contour>()),
+      horizontalContour(make_shared<Contour>()),
+      verticalContour(make_shared<Contour>()),
       totalArea(0),
       isPacked(false) {
 }
 
-/**
- * Destructor
- */
 HBStarTree::~HBStarTree() {
-    // Smart pointers handle memory cleanup
+
 }
 
-/**
- * Adds a module to the tree
- */
-void HBStarTree::addModule(std::shared_ptr<Module> module) {
+/* Add a module to the tree */
+void HBStarTree::addModule(shared_ptr<Module> module) {
     if (!module) return;
     
-    // Add the module to our module map
+    // Add the module to module map
     modules[module->getName()] = module;
 }
 
-/**
- * Adds a symmetry group to the tree
- */
-void HBStarTree::addSymmetryGroup(std::shared_ptr<SymmetryGroup> group) {
+/* Add a symmetry group to the tree */
+void HBStarTree::addSymmetryGroup(shared_ptr<SymmetryGroup> group) {
     if (!group) return;
     
-    // Add the symmetry group to our list
+    // Add the symmetry group to list
     symmetryGroups.push_back(group);
 }
 
-/**
- * Constructs the symmetry islands for each symmetry group
- */
+/* Constructs the symmetry islands for each symmetry group */
 void HBStarTree::constructSymmetryIslands() {
     // Create an ASF-B*-tree for each symmetry group
     for (const auto& group : symmetryGroups) {
-        auto asfTree = std::make_shared<ASFBStarTree>(group);
+        auto asfTree = make_shared<ASFBStarTree>(group);
         
         // Add modules that belong to this symmetry group
         for (const auto& pair : group->getSymmetryPairs()) {
@@ -79,7 +71,7 @@ void HBStarTree::constructSymmetryIslands() {
         asfTree->constructInitialTree();
         
         // Create a hierarchy node for this symmetry group
-        auto hierarchyNode = std::make_shared<HBStarTreeNode>(HBNodeType::HIERARCHY, group->getName());
+        auto hierarchyNode = make_shared<HBStarTreeNode>(HBNodeType::HIERARCHY, group->getName());
         hierarchyNode->setASFTree(asfTree);
         
         // Add the hierarchy node to our map
@@ -87,15 +79,13 @@ void HBStarTree::constructSymmetryIslands() {
     }
 }
 
-/**
- * Constructs the initial tree structure
- */
+/* Constructs the initial tree structure */
 void HBStarTree::constructInitialTreeStructure() {
     // Collect all non-symmetry modules
-    std::vector<std::string> nonSymmetryModules;
+    vector<string> nonSymmetryModules;
     
     // Create a set of all modules in symmetry groups
-    std::set<std::string> symmetryModules;
+    set<string> symmetryModules;
     for (const auto& group : symmetryGroups) {
         for (const auto& pair : group->getSymmetryPairs()) {
             symmetryModules.insert(pair.first);
@@ -114,14 +104,14 @@ void HBStarTree::constructInitialTreeStructure() {
     }
     
     // Sort non-symmetry modules by area (largest first) for better initial placement
-    std::sort(nonSymmetryModules.begin(), nonSymmetryModules.end(), 
-              [this](const std::string& a, const std::string& b) {
+    sort(nonSymmetryModules.begin(), nonSymmetryModules.end(), 
+              [this](const string& a, const string& b) {
                   return modules[a]->getArea() > modules[b]->getArea();
               });
     
     // Create nodes for non-symmetry modules
     for (const auto& moduleName : nonSymmetryModules) {
-        auto node = std::make_shared<HBStarTreeNode>(HBNodeType::MODULE, moduleName);
+        auto node = make_shared<HBStarTreeNode>(HBNodeType::MODULE, moduleName);
         moduleNodes[moduleName] = node;
     }
     
@@ -133,7 +123,7 @@ void HBStarTree::constructInitialTreeStructure() {
             auto current = root;
             
             // Add remaining symmetry groups
-            for (auto it = std::next(symmetryGroupNodes.begin()); it != symmetryGroupNodes.end(); ++it) {
+            for (auto it = next(symmetryGroupNodes.begin()); it != symmetryGroupNodes.end(); ++it) {
                 current->setLeftChild(it->second);
                 it->second->setParent(current);
                 current = it->second;
@@ -162,9 +152,7 @@ void HBStarTree::constructInitialTreeStructure() {
     }
 }
 
-/**
- * Clears the tree
- */
+/* Clears the tree */
 void HBStarTree::clearTree() {
     root = nullptr;
     moduleNodes.clear();
@@ -172,9 +160,7 @@ void HBStarTree::clearTree() {
     isPacked = false;
 }
 
-/**
- * Constructs an initial HB*-tree
- */
+/* Constructs an initial HB*-tree */
 void HBStarTree::constructInitialTree() {
     // Clear any existing tree
     clearTree();
@@ -189,11 +175,11 @@ void HBStarTree::constructInitialTree() {
 /**
  * Finds the nearest contour node for a given node
  */
-std::shared_ptr<HBStarTreeNode> HBStarTree::findNearestContourNode(std::shared_ptr<HBStarTreeNode> node) const {
+shared_ptr<HBStarTreeNode> HBStarTree::findNearestContourNode(shared_ptr<HBStarTreeNode> node) const {
     if (!node || !root) return nullptr;
     
     // Use BFS to find the nearest contour node
-    std::queue<std::shared_ptr<HBStarTreeNode>> queue;
+    queue<shared_ptr<HBStarTreeNode>> queue;
     queue.push(root);
     
     while (!queue.empty()) {
@@ -214,7 +200,7 @@ std::shared_ptr<HBStarTreeNode> HBStarTree::findNearestContourNode(std::shared_p
 /**
  * Finds the leftmost skewed child of a node
  */
-std::shared_ptr<HBStarTreeNode> HBStarTree::findLeftmostSkewedChild(std::shared_ptr<HBStarTreeNode> node) const {
+shared_ptr<HBStarTreeNode> HBStarTree::findLeftmostSkewedChild(shared_ptr<HBStarTreeNode> node) const {
     if (!node) return nullptr;
     
     auto current = node;
@@ -244,8 +230,8 @@ void HBStarTree::updateContourNodes() {
         auto segments = horizontalContour->getSegments();
         
         // Clear existing contour nodes
-        std::vector<std::shared_ptr<HBStarTreeNode>> existingContourNodes;
-        std::queue<std::shared_ptr<HBStarTreeNode>> queue;
+        vector<shared_ptr<HBStarTreeNode>> existingContourNodes;
+        queue<shared_ptr<HBStarTreeNode>> queue;
         
         if (hierarchyNode->getRightChild()) {
             queue.push(hierarchyNode->getRightChild());
@@ -268,10 +254,10 @@ void HBStarTree::updateContourNodes() {
         }
         
         // Create new contour nodes
-        std::vector<std::shared_ptr<HBStarTreeNode>> newContourNodes;
+        vector<shared_ptr<HBStarTreeNode>> newContourNodes;
         for (size_t i = 0; i < segments.size(); ++i) {
-            auto contourNode = std::make_shared<HBStarTreeNode>(HBNodeType::CONTOUR, 
-                                                             pair.first + "_contour_" + std::to_string(i));
+            auto contourNode = make_shared<HBStarTreeNode>(HBNodeType::CONTOUR, 
+                                                             pair.first + "_contour_" + to_string(i));
             contourNode->setContour(segments[i].start, segments[i].height, segments[i].end, segments[i].height);
             newContourNodes.push_back(contourNode);
         }
@@ -290,7 +276,7 @@ void HBStarTree::updateContourNodes() {
         }
         
         // Find dangling nodes - nodes whose parents were contour nodes that no longer exist
-        std::vector<std::shared_ptr<HBStarTreeNode>> danglingNodes;
+        vector<shared_ptr<HBStarTreeNode>> danglingNodes;
         for (const auto& oldContourNode : existingContourNodes) {
             if (oldContourNode->getRightChild()) {
                 danglingNodes.push_back(oldContourNode->getRightChild());
@@ -358,13 +344,13 @@ bool HBStarTree::pack() {
     verticalContour->clear();
     
     // Initialize horizontal contour with a segment at y=0
-    horizontalContour->addSegment(0, std::numeric_limits<int>::max(), 0);
+    horizontalContour->addSegment(0, numeric_limits<int>::max(), 0);
     
     // Initialize vertical contour with a segment at x=0
-    verticalContour->addSegment(0, std::numeric_limits<int>::max(), 0);
+    verticalContour->addSegment(0, numeric_limits<int>::max(), 0);
     
     // Pack the tree in pre-order (DFS)
-    std::stack<std::shared_ptr<HBStarTreeNode>> nodeStack;
+    stack<shared_ptr<HBStarTreeNode>> nodeStack;
     nodeStack.push(root);
     
     int maxX = 0, maxY = 0;
@@ -378,7 +364,7 @@ bool HBStarTree::pack() {
         switch (currentNode->getType()) {
             case HBNodeType::MODULE: {
                 // Pack a regular module
-                const std::string& moduleName = currentNode->getModuleName();
+                const string& moduleName = currentNode->getModuleName();
                 auto module = modules[moduleName];
                 
                 if (!module) continue;
@@ -438,8 +424,8 @@ bool HBStarTree::pack() {
                 verticalContour->addSegment(y, y + module->getHeight(), x + module->getWidth());
                 
                 // Update maximum coordinates
-                maxX = std::max(maxX, x + module->getWidth());
-                maxY = std::max(maxY, y + module->getHeight());
+                maxX = max(maxX, x + module->getWidth());
+                maxY = max(maxY, y + module->getHeight());
                 
                 break;
             }
@@ -452,18 +438,18 @@ bool HBStarTree::pack() {
                 asfTree->pack();
                 
                 // Get the bounding rectangle of the symmetry island
-                int minX = std::numeric_limits<int>::max();
-                int minY = std::numeric_limits<int>::max();
+                int minX = numeric_limits<int>::max();
+                int minY = numeric_limits<int>::max();
                 int symMaxX = 0;
                 int symMaxY = 0;
                 
                 for (const auto& pair : asfTree->getModules()) {
                     const auto& module = pair.second;
                     
-                    minX = std::min(minX, module->getX());
-                    minY = std::min(minY, module->getY());
-                    symMaxX = std::max(symMaxX, module->getX() + module->getWidth());
-                    symMaxY = std::max(symMaxY, module->getY() + module->getHeight());
+                    minX = min(minX, module->getX());
+                    minY = min(minY, module->getY());
+                    symMaxX = max(symMaxX, module->getX() + module->getWidth());
+                    symMaxY = max(symMaxY, module->getY() + module->getHeight());
                 }
                 
                 // Calculate the position for the symmetry island
@@ -529,8 +515,8 @@ bool HBStarTree::pack() {
                 verticalContour->addSegment(y, y + (symMaxY - minY), x + (symMaxX - minX));
                 
                 // Update maximum coordinates
-                maxX = std::max(maxX, x + (symMaxX - minX));
-                maxY = std::max(maxY, y + (symMaxY - minY));
+                maxX = max(maxX, x + (symMaxX - minX));
+                maxY = max(maxY, y + (symMaxY - minY));
                 
                 break;
             }
@@ -563,7 +549,7 @@ bool HBStarTree::pack() {
 /**
  * Performs a rotation operation on a module
  */
-bool HBStarTree::rotateModule(const std::string& moduleName) {
+bool HBStarTree::rotateModule(const string& moduleName) {
     // Check if the module exists
     auto it = modules.find(moduleName);
     if (it == modules.end()) return false;
@@ -572,7 +558,7 @@ bool HBStarTree::rotateModule(const std::string& moduleName) {
     
     // Check if the module is in a symmetry group
     bool inSymmetryGroup = false;
-    std::shared_ptr<SymmetryGroup> group = nullptr;
+    shared_ptr<SymmetryGroup> group = nullptr;
     
     for (const auto& g : symmetryGroups) {
         // Check symmetry pairs
@@ -625,12 +611,12 @@ bool HBStarTree::rotateModule(const std::string& moduleName) {
 /**
  * Moves a node to a new position in the tree
  */
-bool HBStarTree::moveNode(const std::string& nodeName, 
-                          const std::string& newParentName, 
+bool HBStarTree::moveNode(const string& nodeName, 
+                          const string& newParentName, 
                           bool asLeftChild) {
     // Find the nodes
-    std::shared_ptr<HBStarTreeNode> node = nullptr;
-    std::shared_ptr<HBStarTreeNode> newParent = nullptr;
+    shared_ptr<HBStarTreeNode> node = nullptr;
+    shared_ptr<HBStarTreeNode> newParent = nullptr;
     
     // Check if nodeName is a module name
     auto moduleIt = moduleNodes.find(nodeName);
@@ -742,10 +728,10 @@ bool HBStarTree::moveNode(const std::string& nodeName,
 /**
  * Swaps two nodes in the tree
  */
-bool HBStarTree::swapNodes(const std::string& nodeName1, const std::string& nodeName2) {
+bool HBStarTree::swapNodes(const string& nodeName1, const string& nodeName2) {
     // Find the nodes
-    std::shared_ptr<HBStarTreeNode> node1 = nullptr;
-    std::shared_ptr<HBStarTreeNode> node2 = nullptr;
+    shared_ptr<HBStarTreeNode> node1 = nullptr;
+    shared_ptr<HBStarTreeNode> node2 = nullptr;
     
     // Check if nodeName1 is a module name
     auto moduleIt1 = moduleNodes.find(nodeName1);
@@ -940,8 +926,8 @@ bool HBStarTree::swapNodes(const std::string& nodeName1, const std::string& node
 /**
  * Changes the representative of a symmetry pair in a symmetry group
  */
-bool HBStarTree::changeRepresentative(const std::string& symmetryGroupName, 
-                                     const std::string& moduleName) {
+bool HBStarTree::changeRepresentative(const string& symmetryGroupName, 
+                                     const string& moduleName) {
     // Find the symmetry group
     auto it = symmetryGroupNodes.find(symmetryGroupName);
     if (it == symmetryGroupNodes.end()) return false;
@@ -965,7 +951,7 @@ bool HBStarTree::changeRepresentative(const std::string& symmetryGroupName,
 /**
  * Converts the symmetry type of a symmetry group
  */
-bool HBStarTree::convertSymmetryType(const std::string& symmetryGroupName) {
+bool HBStarTree::convertSymmetryType(const string& symmetryGroupName) {
     // Find the symmetry group
     auto it = symmetryGroupNodes.find(symmetryGroupName);
     if (it == symmetryGroupNodes.end()) return false;
@@ -997,36 +983,35 @@ int HBStarTree::getArea() const {
  * Returns the total wire length of the placement
  */
 int HBStarTree::getWireLength() const {
-    // Wire length calculation depends on netlist information
-    // Since this is not provided, return 0 for now
+    // Wire length calculation depends on netlist information, return 0 for now
     return 0;
 }
 
 /**
  * Gets the root node of the HB*-tree
  */
-std::shared_ptr<HBStarTreeNode> HBStarTree::getRoot() const {
+shared_ptr<HBStarTreeNode> HBStarTree::getRoot() const {
     return root;
 }
 
 /**
  * Gets all modules in the design
  */
-const std::map<std::string, std::shared_ptr<Module>>& HBStarTree::getModules() const {
+const map<string, shared_ptr<Module>>& HBStarTree::getModules() const {
     return modules;
 }
 
 /**
  * Gets all symmetry groups in the design
  */
-const std::vector<std::shared_ptr<SymmetryGroup>>& HBStarTree::getSymmetryGroups() const {
+const vector<shared_ptr<SymmetryGroup>>& HBStarTree::getSymmetryGroups() const {
     return symmetryGroups;
 }
 
 /**
  * Gets the module node with the given name
  */
-std::shared_ptr<HBStarTreeNode> HBStarTree::getModuleNode(const std::string& moduleName) const {
+shared_ptr<HBStarTreeNode> HBStarTree::getModuleNode(const string& moduleName) const {
     auto it = moduleNodes.find(moduleName);
     if (it == moduleNodes.end()) return nullptr;
     
@@ -1036,7 +1021,7 @@ std::shared_ptr<HBStarTreeNode> HBStarTree::getModuleNode(const std::string& mod
 /**
  * Gets the symmetry group node with the given name
  */
-std::shared_ptr<HBStarTreeNode> HBStarTree::getSymmetryGroupNode(const std::string& symmetryGroupName) const {
+shared_ptr<HBStarTreeNode> HBStarTree::getSymmetryGroupNode(const string& symmetryGroupName) const {
     auto it = symmetryGroupNodes.find(symmetryGroupName);
     if (it == symmetryGroupNodes.end()) return nullptr;
     
@@ -1046,19 +1031,19 @@ std::shared_ptr<HBStarTreeNode> HBStarTree::getSymmetryGroupNode(const std::stri
 /**
  * Creates a deep copy of this HB*-tree
  */
-std::shared_ptr<HBStarTree> HBStarTree::clone() const {
-    auto clone = std::make_shared<HBStarTree>();
+shared_ptr<HBStarTree> HBStarTree::clone() const {
+    auto clone = make_shared<HBStarTree>();
     
     // Copy modules
     for (const auto& pair : modules) {
-        auto moduleCopy = std::make_shared<Module>(*pair.second);
+        auto moduleCopy = make_shared<Module>(*pair.second);
         clone->modules[pair.first] = moduleCopy;
     }
     
     // Copy symmetry groups
     for (const auto& group : symmetryGroups) {
         // Deep copy of symmetry group
-        auto groupCopy = std::make_shared<SymmetryGroup>(*group);
+        auto groupCopy = make_shared<SymmetryGroup>(*group);
         clone->symmetryGroups.push_back(groupCopy);
     }
     
@@ -1070,8 +1055,8 @@ std::shared_ptr<HBStarTree> HBStarTree::clone() const {
     clone->totalArea = totalArea;
     
     // Copy contours
-    clone->horizontalContour = std::make_shared<Contour>(*horizontalContour);
-    clone->verticalContour = std::make_shared<Contour>(*verticalContour);
+    clone->horizontalContour = make_shared<Contour>(*horizontalContour);
+    clone->verticalContour = make_shared<Contour>(*verticalContour);
     
     return clone;
 }

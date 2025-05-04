@@ -28,17 +28,8 @@ public:
      * @param moduleName Name of the module corresponding to this node
      */
     BStarTreeNode(const std::string& moduleName);
-    
-    /**
-     * Destructor
-     */
     ~BStarTreeNode();
     
-    /**
-     * Gets the module name
-     * 
-     * @return Module name
-     */
     std::string getModuleName() const;
     
     /**

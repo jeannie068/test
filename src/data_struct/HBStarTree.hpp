@@ -22,27 +22,25 @@
 #include "Module.hpp"
 #include "SymmetryConstraint.hpp"
 #include "../utils/Contour.hpp"
+using namespace std;
 
 class HBStarTree {
 private:
-    // Root node of the HB*-tree
-    std::shared_ptr<HBStarTreeNode> root;
+
+    shared_ptr<HBStarTreeNode> root;
     
-    // All modules in the design
-    std::map<std::string, std::shared_ptr<Module>> modules;
-    
-    // All symmetry groups in the design
-    std::vector<std::shared_ptr<SymmetryGroup>> symmetryGroups;
+    map<string, shared_ptr<Module>> modules; // All modules
+    vector<shared_ptr<SymmetryGroup>> symmetryGroups; // All symmetry groups 
     
     // Map from symmetry group name to its hierarchy node
-    std::map<std::string, std::shared_ptr<HBStarTreeNode>> symmetryGroupNodes;
+    map<string, shared_ptr<HBStarTreeNode>> symmetryGroupNodes;
     
     // Map from module name to its node in the tree
-    std::map<std::string, std::shared_ptr<HBStarTreeNode>> moduleNodes;
+    map<string, shared_ptr<HBStarTreeNode>> moduleNodes;
     
     // Contour for efficient packing
-    std::shared_ptr<Contour> horizontalContour;
-    std::shared_ptr<Contour> verticalContour;
+    shared_ptr<Contour> horizontalContour;
+    shared_ptr<Contour> verticalContour;
     
     // Total area of the placement
     int totalArea;
@@ -54,8 +52,8 @@ private:
     void updateContourNodes();
     void handleDanglingNodes();
     bool validateSymmetryIslandPlacement() const;
-    std::shared_ptr<HBStarTreeNode> findNearestContourNode(std::shared_ptr<HBStarTreeNode> node) const;
-    std::shared_ptr<HBStarTreeNode> findLeftmostSkewedChild(std::shared_ptr<HBStarTreeNode> node) const;
+    shared_ptr<HBStarTreeNode> findNearestContourNode(shared_ptr<HBStarTreeNode> node) const;
+    shared_ptr<HBStarTreeNode> findLeftmostSkewedChild(shared_ptr<HBStarTreeNode> node) const;
     void constructSymmetryIslands();
     void constructInitialTreeStructure();
     void clearTree();
@@ -65,29 +63,15 @@ public:
      * Constructor
      */
     HBStarTree();
-    
-    /**
-     * Destructor
-     */
     ~HBStarTree();
     
-    /**
-     * Adds a module to the tree
-     * 
-     * @param module Module to add
-     */
-    void addModule(std::shared_ptr<Module> module);
+    /* Adds a module to the treec */
+    void addModule(shared_ptr<Module> module);
     
-    /**
-     * Adds a symmetry group to the tree
-     * 
-     * @param group Symmetry group to add
-     */
-    void addSymmetryGroup(std::shared_ptr<SymmetryGroup> group);
+    /* Adds a symmetry group to the tree */
+    void addSymmetryGroup(shared_ptr<SymmetryGroup> group);
     
-    /**
-     * Constructs an initial HB*-tree
-     */
+    /* Constructs an initial HB*-tree */
     void constructInitialTree();
     
     /**
@@ -103,7 +87,7 @@ public:
      * @param moduleName Name of the module to rotate
      * @return True if the rotation was successful, false otherwise
      */
-    bool rotateModule(const std::string& moduleName);
+    bool rotateModule(const string& moduleName);
     
     /**
      * Moves a node to a new position in the tree
@@ -113,8 +97,8 @@ public:
      * @param asLeftChild True if the node should be the left child, false for right child
      * @return True if the move was successful, false otherwise
      */
-    bool moveNode(const std::string& nodeName, 
-                  const std::string& newParentName, 
+    bool moveNode(const string& nodeName, 
+                  const string& newParentName, 
                   bool asLeftChild);
     
     /**
@@ -124,7 +108,7 @@ public:
      * @param nodeName2 Name of the second node
      * @return True if the swap was successful, false otherwise
      */
-    bool swapNodes(const std::string& nodeName1, const std::string& nodeName2);
+    bool swapNodes(const string& nodeName1, const string& nodeName2);
     
     /**
      * Changes the representative of a symmetry pair in a symmetry group
@@ -133,7 +117,7 @@ public:
      * @param moduleName Name of the module in the symmetry pair
      * @return True if the change was successful, false otherwise
      */
-    bool changeRepresentative(const std::string& symmetryGroupName, const std::string& moduleName);
+    bool changeRepresentative(const string& symmetryGroupName, const string& moduleName);
     
     /**
      * Converts the symmetry type of a symmetry group
@@ -141,13 +125,9 @@ public:
      * @param symmetryGroupName Name of the symmetry group
      * @return True if the conversion was successful, false otherwise
      */
-    bool convertSymmetryType(const std::string& symmetryGroupName);
+    bool convertSymmetryType(const string& symmetryGroupName);
     
-    /**
-     * Returns the total area of the placement
-     * 
-     * @return Total area of the placement
-     */
+    /* Returns the total area of the placement */
     int getArea() const;
     
     /**
@@ -162,21 +142,21 @@ public:
      * 
      * @return Root node of the HB*-tree
      */
-    std::shared_ptr<HBStarTreeNode> getRoot() const;
+    shared_ptr<HBStarTreeNode> getRoot() const;
     
     /**
      * Gets all modules in the design
      * 
      * @return Map of module names to modules
      */
-    const std::map<std::string, std::shared_ptr<Module>>& getModules() const;
+    const map<string, shared_ptr<Module>>& getModules() const;
     
     /**
      * Gets all symmetry groups in the design
      * 
      * @return Vector of symmetry groups
      */
-    const std::vector<std::shared_ptr<SymmetryGroup>>& getSymmetryGroups() const;
+    const vector<shared_ptr<SymmetryGroup>>& getSymmetryGroups() const;
     
     /**
      * Gets the module node with the given name
@@ -184,7 +164,7 @@ public:
      * @param moduleName Name of the module
      * @return Module node with the given name, or nullptr if not found
      */
-    std::shared_ptr<HBStarTreeNode> getModuleNode(const std::string& moduleName) const;
+    shared_ptr<HBStarTreeNode> getModuleNode(const string& moduleName) const;
     
     /**
      * Gets the symmetry group node with the given name
@@ -192,12 +172,12 @@ public:
      * @param symmetryGroupName Name of the symmetry group
      * @return Symmetry group node with the given name, or nullptr if not found
      */
-    std::shared_ptr<HBStarTreeNode> getSymmetryGroupNode(const std::string& symmetryGroupName) const;
+    shared_ptr<HBStarTreeNode> getSymmetryGroupNode(const string& symmetryGroupName) const;
     
     /**
      * Creates a deep copy of this HB*-tree
      * 
      * @return A new HB*-tree that is a deep copy of this one
      */
-    std::shared_ptr<HBStarTree> clone() const;
+    shared_ptr<HBStarTree> clone() const;
 };

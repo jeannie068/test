@@ -8,12 +8,6 @@
 #include <string>
 #include "../data_struct/HBStarTree.hpp"
 
-/**
- * SimulatedAnnealing class for optimizing analog placement with symmetry constraints
- * 
- * This class implements the simulated annealing algorithm to find an optimized
- * placement solution using the HB*-tree representation.
- */
 class SimulatedAnnealing {
 private:
     // The current state of the placement solution
@@ -28,7 +22,7 @@ private:
     // Cost of the best solution
     int bestCost;
     
-    // Simulated annealing parameters
+    // SA parameters
     double initialTemperature;
     double finalTemperature;
     double coolingRate;
@@ -58,51 +52,36 @@ private:
     
     /**
      * Calculates the cost of a solution
-     * 
-     * @param solution Solution to evaluate
-     * @return Cost value
      */
     int calculateCost(const std::shared_ptr<HBStarTree>& solution) const;
     
     /**
      * Performs a random perturbation on the current solution
-     * 
-     * @return True if the perturbation was successful, false otherwise
      */
     bool perturb();
     
     /**
      * Rotates a random module
-     * 
-     * @return True if the rotation was successful, false otherwise
      */
     bool perturbRotate();
     
     /**
      * Moves a random node to a new position
-     * 
-     * @return True if the move was successful, false otherwise
      */
     bool perturbMove();
     
     /**
      * Swaps two random nodes
-     * 
-     * @return True if the swap was successful, false otherwise
      */
     bool perturbSwap();
     
     /**
      * Changes the representative of a symmetry pair in a random symmetry group
-     * 
-     * @return True if the change was successful, false otherwise
      */
     bool perturbChangeRepresentative();
     
     /**
      * Converts the symmetry type of a random symmetry group
-     * 
-     * @return True if the conversion was successful, false otherwise
      */
     bool perturbConvertSymmetryType();
     
@@ -139,13 +118,6 @@ private:
 public:
     /**
      * Constructor
-     * 
-     * @param initialSolution Initial placement solution
-     * @param initialTemp Initial temperature
-     * @param finalTemp Final temperature
-     * @param coolingRate Cooling rate (e.g., 0.95)
-     * @param iterations Number of iterations per temperature
-     * @param noImprovementLimit Maximum number of iterations without improvement
      */
     SimulatedAnnealing(std::shared_ptr<HBStarTree> initialSolution,
                       double initialTemp = 1000.0,
@@ -181,18 +153,7 @@ public:
      */
     std::shared_ptr<HBStarTree> run();
     
-    /**
-     * Gets the best solution found
-     * 
-     * @return Best solution
-     */
     std::shared_ptr<HBStarTree> getBestSolution() const;
-    
-    /**
-     * Gets the cost of the best solution
-     * 
-     * @return Cost value
-     */
     int getBestCost() const;
     
     /**

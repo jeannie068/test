@@ -87,7 +87,7 @@ int SimulatedAnnealing::calculateCost(const std::shared_ptr<HBStarTree>& solutio
     // Area cost
     int areaCost = solution->getArea();
     
-    // Wirelength cost (if needed)
+    // Wirelength cost
     int wirelengthCost = solution->getWireLength();
     
     // Weighted sum
@@ -263,7 +263,7 @@ bool SimulatedAnnealing::acceptMove(int costDifference, double temperature) cons
 }
 
 /**
- * Runs the simulated annealing algorithm
+ * Runs the SA
  */
 std::shared_ptr<HBStarTree> SimulatedAnnealing::run() {
     double temperature = initialTemperature;
@@ -335,16 +335,11 @@ std::shared_ptr<HBStarTree> SimulatedAnnealing::run() {
     return bestSolution;
 }
 
-/**
- * Gets the best solution found
- */
+
 std::shared_ptr<HBStarTree> SimulatedAnnealing::getBestSolution() const {
     return bestSolution;
 }
 
-/**
- * Gets the cost of the best solution
- */
 int SimulatedAnnealing::getBestCost() const {
     return bestCost;
 }

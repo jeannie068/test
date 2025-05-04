@@ -1,16 +1,12 @@
-/**
- * HBStarTreeNode.cpp
- * 
- * Implementation of the HBStarTreeNode class for the hierarchical B*-tree (HB*-tree)
- * used in analog placement with symmetry constraints.
- */
+// HBStarTreeNode.cpp
 
 #include "HBStarTreeNode.hpp"
+using namespace std;
 
 /**
  * Constructor
  */
-HBStarTreeNode::HBStarTreeNode(HBNodeType type, const std::string& name)
+HBStarTreeNode::HBStarTreeNode(HBNodeType type, const string& name)
     : type(type), 
       name(name), 
       leftChild(nullptr), 
@@ -23,17 +19,9 @@ HBStarTreeNode::HBStarTreeNode(HBNodeType type, const std::string& name)
     // Parent is initialized as empty weak_ptr by default
 }
 
-/**
- * Destructor
- */
 HBStarTreeNode::~HBStarTreeNode() {
-    // Smart pointers handle memory cleanup
-    // Note: Use weak_ptr for parent to avoid circular reference issues
 }
 
-/**
- * Gets the node type
- */
 HBNodeType HBStarTreeNode::getType() const {
     return type;
 }
@@ -41,14 +29,11 @@ HBNodeType HBStarTreeNode::getType() const {
 /**
  * Gets the node name
  */
-std::string HBStarTreeNode::getName() const {
+string HBStarTreeNode::getName() const {
     return name;
 }
 
-/**
- * Gets the module name (for MODULE type nodes)
- */
-std::string HBStarTreeNode::getModuleName() const {
+string HBStarTreeNode::getModuleName() const {
     // For MODULE type nodes, the name is the module name
     if (type == HBNodeType::MODULE) {
         return name;
@@ -56,53 +41,36 @@ std::string HBStarTreeNode::getModuleName() const {
     return "";
 }
 
-/**
- * Gets the left child (module to the right)
- */
-std::shared_ptr<HBStarTreeNode> HBStarTreeNode::getLeftChild() const {
+shared_ptr<HBStarTreeNode> HBStarTreeNode::getLeftChild() const {
     return leftChild;
 }
 
-/**
- * Gets the right child (module above)
- */
-std::shared_ptr<HBStarTreeNode> HBStarTreeNode::getRightChild() const {
+shared_ptr<HBStarTreeNode> HBStarTreeNode::getRightChild() const {
     return rightChild;
 }
 
-/**
- * Gets the parent node
- */
-std::shared_ptr<HBStarTreeNode> HBStarTreeNode::getParent() const {
+shared_ptr<HBStarTreeNode> HBStarTreeNode::getParent() const {
     // Convert weak_ptr to shared_ptr for returning
     return parent.lock();
 }
 
-/**
- * Sets the left child (module to the right)
- */
-void HBStarTreeNode::setLeftChild(std::shared_ptr<HBStarTreeNode> node) {
+void HBStarTreeNode::setLeftChild(shared_ptr<HBStarTreeNode> node) {
     leftChild = node;
 }
 
-/**
- * Sets the right child (module above)
- */
-void HBStarTreeNode::setRightChild(std::shared_ptr<HBStarTreeNode> node) {
+void HBStarTreeNode::setRightChild(shared_ptr<HBStarTreeNode> node) {
     rightChild = node;
 }
 
-/**
- * Sets the parent node
- */
-void HBStarTreeNode::setParent(std::shared_ptr<HBStarTreeNode> node) {
+void HBStarTreeNode::setParent(shared_ptr<HBStarTreeNode> node) {
     parent = node;  // Automatically converts to weak_ptr
 }
+
 
 /**
  * Gets the ASF-B*-tree (for HIERARCHY type nodes)
  */
-std::shared_ptr<ASFBStarTree> HBStarTreeNode::getASFTree() const {
+shared_ptr<ASFBStarTree> HBStarTreeNode::getASFTree() const {
     if (type != HBNodeType::HIERARCHY) {
         return nullptr;
     }
@@ -112,14 +80,15 @@ std::shared_ptr<ASFBStarTree> HBStarTreeNode::getASFTree() const {
 /**
  * Sets the ASF-B*-tree (for HIERARCHY type nodes)
  */
-void HBStarTreeNode::setASFTree(std::shared_ptr<ASFBStarTree> tree) {
+void HBStarTreeNode::setASFTree(shared_ptr<ASFBStarTree> tree) {
     if (type == HBNodeType::HIERARCHY) {
         asfTree = tree;
     }
 }
 
+
 /**
- * Sets the contour segment coordinates (for CONTOUR type nodes)
+ * For CONTOUR type nodes
  */
 void HBStarTreeNode::setContour(int x1, int y1, int x2, int y2) {
     if (type == HBNodeType::CONTOUR) {
@@ -130,9 +99,6 @@ void HBStarTreeNode::setContour(int x1, int y1, int x2, int y2) {
     }
 }
 
-/**
- * Gets the contour segment coordinates (for CONTOUR type nodes)
- */
 void HBStarTreeNode::getContour(int& x1, int& y1, int& x2, int& y2) const {
     if (type == HBNodeType::CONTOUR) {
         x1 = contourX1;
@@ -148,16 +114,11 @@ void HBStarTreeNode::getContour(int& x1, int& y1, int& x2, int& y2) const {
     }
 }
 
-/**
- * Checks if this node is a leaf node (no children)
- */
+
 bool HBStarTreeNode::isLeaf() const {
     return !leftChild && !rightChild;
 }
 
-/**
- * Checks if this node is the left child of its parent
- */
 bool HBStarTreeNode::isLeftChild() const {
     auto parentNode = parent.lock();
     if (!parentNode) return false;  // No parent
@@ -165,9 +126,6 @@ bool HBStarTreeNode::isLeftChild() const {
     return parentNode->getLeftChild().get() == this;
 }
 
-/**
- * Checks if this node is the right child of its parent
- */
 bool HBStarTreeNode::isRightChild() const {
     auto parentNode = parent.lock();
     if (!parentNode) return false;  // No parent
@@ -178,9 +136,9 @@ bool HBStarTreeNode::isRightChild() const {
 /**
  * Creates a deep copy of this node and its children
  */
-std::shared_ptr<HBStarTreeNode> HBStarTreeNode::clone() const {
+shared_ptr<HBStarTreeNode> HBStarTreeNode::clone() const {
     // Create a new node with the same type and name
-    auto clonedNode = std::make_shared<HBStarTreeNode>(type, name);
+    auto clonedNode = make_shared<HBStarTreeNode>(type, name);
     
     // Copy type-specific data
     if (type == HBNodeType::HIERARCHY && asfTree) {

@@ -20,12 +20,12 @@ private:
     vector<string> selfSymmetric;          // Self-symmetric modules
     SymmetryType type;                               // Symmetry type (vertical/horizontal)
     
-    // Efficient lookup structures
+    // Hash table for lookup structures
     unordered_map<string, string> pairMap;  // For quick symmetry pair lookup
     unordered_set<string> selfSymSet;            // For quick self-symmetric lookup
     unordered_set<string> allModules;            // All modules in this group
     
-    // Symmetry axis position
+    // Symmetry axis position - VERTICAL: x; HORIZONTAL: y
     double axisPosition;
 
 public:

@@ -6,15 +6,16 @@
 #include <iostream>
 #include <limits>
 #include <cmath>
+using namespace std;
 
 /**
  * Constructor
  */
-ASFBStarTree::ASFBStarTree(std::shared_ptr<SymmetryGroup> symmetryGroup)
+ASFBStarTree::ASFBStarTree(shared_ptr<SymmetryGroup> symmetryGroup)
     : symmetryGroup(symmetryGroup), 
       root(nullptr),
-      horizontalContour(std::make_shared<Contour>()),
-      verticalContour(std::make_shared<Contour>()),
+      horizontalContour(make_shared<Contour>()),
+      verticalContour(make_shared<Contour>()),
       symmetryAxisPosition(0.0) {
     
     // Initialize representative and symmetry pair maps
@@ -32,7 +33,7 @@ ASFBStarTree::ASFBStarTree(std::shared_ptr<SymmetryGroup> symmetryGroup)
         
         // Process self-symmetric modules
         for (const auto& moduleName : symmetryGroup->getSelfSymmetric()) {
-            // For a self-symmetric module, it represents itself but in a special way (half of it)
+            // For a self-symmetric module, it represents itself but half of it
             representativeMap[moduleName] = moduleName;
             selfSymmetricModules.push_back(moduleName);
         }
@@ -40,13 +41,12 @@ ASFBStarTree::ASFBStarTree(std::shared_ptr<SymmetryGroup> symmetryGroup)
 }
 
 ASFBStarTree::~ASFBStarTree() {
-    // Smart pointers handle memory cleanup
 }
 
 /**
  * Adds a module to the tree
  */
-void ASFBStarTree::addModule(std::shared_ptr<Module> module) {
+void ASFBStarTree::addModule(shared_ptr<Module> module) {
     if (!module) return;
     
     // Add the module to our module map
@@ -61,9 +61,9 @@ void ASFBStarTree::constructInitialTree() {
     root = nullptr;
     
     // First, collect all representatives
-    std::vector<std::string> representatives;
+    vector<string> representatives;
     for (const auto& pair : modules) {
-        const std::string& moduleName = pair.first;
+        const string& moduleName = pair.first;
         if (isRepresentative(moduleName)) {
             representatives.push_back(moduleName);
         }
@@ -71,21 +71,21 @@ void ASFBStarTree::constructInitialTree() {
     
     if (representatives.empty()) return;
     
-    // Sort representatives by area (largest first) for better initial placement
-    std::sort(representatives.begin(), representatives.end(), 
-              [this](const std::string& a, const std::string& b) {
+    // Sort representatives by area (largest first)
+    sort(representatives.begin(), representatives.end(), 
+              [this](const string& a, const string& b) {
                   return modules[a]->getArea() > modules[b]->getArea();
               });
     
     // Create the root node with the first representative
-    root = std::make_shared<BStarTreeNode>(representatives[0]);
+    root = make_shared<BStarTreeNode>(representatives[0]);
     
     // Add other representatives to the tree
     for (size_t i = 1; i < representatives.size(); ++i) {
-        auto newNode = std::make_shared<BStarTreeNode>(representatives[i]);
+        auto newNode = make_shared<BStarTreeNode>(representatives[i]);
         
-        // If it's a self-symmetric module, it must be on the boundary
-        if (std::find(selfSymmetricModules.begin(), selfSymmetricModules.end(), 
+        // Case: self-symmetric module - it must be on the boundary
+        if (find(selfSymmetricModules.begin(), selfSymmetricModules.end(), 
                       representatives[i]) != selfSymmetricModules.end()) {
             
             // Place self-symmetric modules on the rightmost branch for vertical symmetry
@@ -108,7 +108,7 @@ void ASFBStarTree::constructInitialTree() {
                 newNode->setParent(current);
             }
         } else {
-            // For symmetry pairs, we can place them anywhere
+            // Case: symmetry pairs - can place anywhere
             // For simplicity, place them as right children of the rightmost node
             auto current = root;
             while (current->getRightChild()) {
@@ -128,16 +128,16 @@ void ASFBStarTree::initializeContours() {
     verticalContour->clear();
     
     // Initialize horizontal contour with a segment at y=0
-    horizontalContour->addSegment(0, std::numeric_limits<int>::max(), 0);
+    horizontalContour->addSegment(0, numeric_limits<int>::max(), 0);
     
     // Initialize vertical contour with a segment at x=0
-    verticalContour->addSegment(0, std::numeric_limits<int>::max(), 0);
+    verticalContour->addSegment(0, numeric_limits<int>::max(), 0);
 }
 
 /**
  * Update contour with a module
  */
-void ASFBStarTree::updateContourWithModule(const std::shared_ptr<Module>& module) {
+void ASFBStarTree::updateContourWithModule(const shared_ptr<Module>& module) {
     if (!module) return;
     
     int x = module->getX();
@@ -155,10 +155,10 @@ void ASFBStarTree::updateContourWithModule(const std::shared_ptr<Module>& module
 /**
  * Pack a node in the ASF-B*-tree
  */
-void ASFBStarTree::packNode(const std::shared_ptr<BStarTreeNode>& node) {
+void ASFBStarTree::packNode(const shared_ptr<BStarTreeNode>& node) {
     if (!node) return;
     
-    const std::string& moduleName = node->getModuleName();
+    const string& moduleName = node->getModuleName();
     auto module = modules[moduleName];
     
     if (!module) return;
@@ -183,7 +183,7 @@ void ASFBStarTree::packNode(const std::shared_ptr<BStarTreeNode>& node) {
     y = horizontalContour->getHeight(x, x + module->getWidth());
     
     // Special handling for self-symmetric modules
-    if (std::find(selfSymmetricModules.begin(), selfSymmetricModules.end(), 
+    if (find(selfSymmetricModules.begin(), selfSymmetricModules.end(), 
                  moduleName) != selfSymmetricModules.end()) {
         // Self-symmetric modules must be on the boundary
         if (symmetryGroup->getType() == SymmetryType::VERTICAL) {
@@ -208,8 +208,8 @@ void ASFBStarTree::packNode(const std::shared_ptr<BStarTreeNode>& node) {
 void ASFBStarTree::calculateSymmetricModulePositions() {
     // Process symmetry pairs
     for (const auto& pair : symmetryGroup->getSymmetryPairs()) {
-        const std::string& module1 = pair.first;
-        const std::string& module2 = pair.second;
+        const string& module1 = pair.first;
+        const string& module2 = pair.second;
         
         // If module2 is the representative, calculate the position of module1
         if (representativeMap[module1] == module2) {
@@ -259,7 +259,7 @@ bool ASFBStarTree::pack() {
     int maxX = 0, maxY = 0;
     
     // Traverse the tree in pre-order and pack each node
-    std::queue<std::shared_ptr<BStarTreeNode>> nodeQueue;
+    queue<shared_ptr<BStarTreeNode>> nodeQueue;
     nodeQueue.push(root);
     
     while (!nodeQueue.empty()) {
@@ -274,8 +274,8 @@ bool ASFBStarTree::pack() {
         // Update maximum coordinates
         auto module = modules[currentNode->getModuleName()];
         if (module) {
-            maxX = std::max(maxX, module->getX() + module->getWidth());
-            maxY = std::max(maxY, module->getY() + module->getHeight());
+            maxX = max(maxX, module->getX() + module->getWidth());
+            maxY = max(maxY, module->getY() + module->getHeight());
         }
         
         // Add children to the queue
@@ -306,9 +306,9 @@ bool ASFBStarTree::pack() {
 bool ASFBStarTree::isSymmetricFeasible() const {
     // Check self-symmetric modules
     for (const auto& moduleName : selfSymmetricModules) {
-        auto node = [this, &moduleName]() -> std::shared_ptr<BStarTreeNode> {
+        auto node = [this, &moduleName]() -> shared_ptr<BStarTreeNode> {
             // Find the node for this module
-            std::queue<std::shared_ptr<BStarTreeNode>> queue;
+            queue<shared_ptr<BStarTreeNode>> queue;
             if (root) queue.push(root);
             
             while (!queue.empty()) {
@@ -361,8 +361,8 @@ bool ASFBStarTree::isSymmetricFeasible() const {
 int ASFBStarTree::getArea() const {
     if (modules.empty()) return 0;
     
-    int minX = std::numeric_limits<int>::max();
-    int minY = std::numeric_limits<int>::max();
+    int minX = numeric_limits<int>::max();
+    int minY = numeric_limits<int>::max();
     int maxX = 0;
     int maxY = 0;
     
@@ -370,10 +370,10 @@ int ASFBStarTree::getArea() const {
     for (const auto& pair : modules) {
         const auto& module = pair.second;
         
-        minX = std::min(minX, module->getX());
-        minY = std::min(minY, module->getY());
-        maxX = std::max(maxX, module->getX() + module->getWidth());
-        maxY = std::max(maxY, module->getY() + module->getHeight());
+        minX = min(minX, module->getX());
+        minY = min(minY, module->getY());
+        maxX = max(maxX, module->getX() + module->getWidth());
+        maxY = max(maxY, module->getY() + module->getHeight());
     }
     
     return (maxX - minX) * (maxY - minY);
@@ -382,14 +382,14 @@ int ASFBStarTree::getArea() const {
 /**
  * Gets the contour of the symmetry island (for HB*-tree)
  */
-std::pair<std::shared_ptr<Contour>, std::shared_ptr<Contour>> ASFBStarTree::getContours() const {
+pair<shared_ptr<Contour>, shared_ptr<Contour>> ASFBStarTree::getContours() const {
     return {horizontalContour, verticalContour};
 }
 
 /**
  * Rotates a module in the symmetry group
  */
-bool ASFBStarTree::rotateModule(const std::string& moduleName) {
+bool ASFBStarTree::rotateModule(const string& moduleName) {
     auto it = modules.find(moduleName);
     if (it == modules.end()) return false;
     
@@ -397,7 +397,7 @@ bool ASFBStarTree::rotateModule(const std::string& moduleName) {
     
     // Special handling for symmetry pairs and self-symmetric modules
     auto pairIt = symmetricPairMap.find(moduleName);
-    auto selfIt = std::find(selfSymmetricModules.begin(), selfSymmetricModules.end(), moduleName);
+    auto selfIt = find(selfSymmetricModules.begin(), selfSymmetricModules.end(), moduleName);
     
     if (pairIt != symmetricPairMap.end()) {
         // For symmetry pairs, rotate both modules
@@ -419,15 +419,15 @@ bool ASFBStarTree::rotateModule(const std::string& moduleName) {
 /**
  * Helper function: checks if a module is on the boundary
  */
-bool ASFBStarTree::isOnBoundary(const std::string& moduleName) const {
-    return std::find(selfSymmetricModules.begin(), selfSymmetricModules.end(), moduleName) != selfSymmetricModules.end();
+bool ASFBStarTree::isOnBoundary(const string& moduleName) const {
+    return find(selfSymmetricModules.begin(), selfSymmetricModules.end(), moduleName) != selfSymmetricModules.end();
 }
 
 /**
  * Helper function: checks if a node can be moved to a new position
  */
-bool ASFBStarTree::canMoveNode(const std::shared_ptr<BStarTreeNode>& node, 
-                              const std::shared_ptr<BStarTreeNode>& newParent, 
+bool ASFBStarTree::canMoveNode(const shared_ptr<BStarTreeNode>& node, 
+                              const shared_ptr<BStarTreeNode>& newParent, 
                               bool asLeftChild) const {
     if (!node || !newParent) return false;
     
@@ -467,15 +467,15 @@ bool ASFBStarTree::canMoveNode(const std::shared_ptr<BStarTreeNode>& node,
 /**
  * Moves a node to a new position in the tree
  */
-bool ASFBStarTree::moveNode(const std::string& nodeName, 
-                           const std::string& newParentName, 
+bool ASFBStarTree::moveNode(const string& nodeName, 
+                           const string& newParentName, 
                            bool asLeftChild) {
     // Find the nodes
-    std::shared_ptr<BStarTreeNode> node = nullptr;
-    std::shared_ptr<BStarTreeNode> newParent = nullptr;
+    shared_ptr<BStarTreeNode> node = nullptr;
+    shared_ptr<BStarTreeNode> newParent = nullptr;
     
     // Find the node to move
-    std::queue<std::shared_ptr<BStarTreeNode>> queue;
+    queue<shared_ptr<BStarTreeNode>> queue;
     if (root) queue.push(root);
     
     while (!queue.empty() && (!node || !newParent)) {
@@ -540,13 +540,13 @@ bool ASFBStarTree::moveNode(const std::string& nodeName,
 /**
  * Swaps two nodes in the tree
  */
-bool ASFBStarTree::swapNodes(const std::string& nodeName1, const std::string& nodeName2) {
+bool ASFBStarTree::swapNodes(const string& nodeName1, const string& nodeName2) {
     // Find the nodes
-    std::shared_ptr<BStarTreeNode> node1 = nullptr;
-    std::shared_ptr<BStarTreeNode> node2 = nullptr;
+    shared_ptr<BStarTreeNode> node1 = nullptr;
+    shared_ptr<BStarTreeNode> node2 = nullptr;
     
     // Find the nodes to swap
-    std::queue<std::shared_ptr<BStarTreeNode>> queue;
+    queue<shared_ptr<BStarTreeNode>> queue;
     if (root) queue.push(root);
     
     while (!queue.empty() && (!node1 || !node2)) {
@@ -646,13 +646,13 @@ bool ASFBStarTree::swapNodes(const std::string& nodeName1, const std::string& no
 /**
  * Changes the representative of a symmetry pair
  */
-bool ASFBStarTree::changeRepresentative(const std::string& moduleName) {
+bool ASFBStarTree::changeRepresentative(const string& moduleName) {
     // Find the symmetry pair
     auto pairIt = symmetricPairMap.find(moduleName);
     if (pairIt == symmetricPairMap.end()) return false;
     
-    std::string module1 = moduleName;
-    std::string module2 = pairIt->second;
+    string module1 = moduleName;
+    string module2 = pairIt->second;
     
     // Update the representative map
     if (representativeMap[module1] == module2) {
@@ -695,38 +695,36 @@ bool ASFBStarTree::convertSymmetryType() {
     return true;
 }
 
-/**
- * Gets the root node of the ASF-B*-tree
- */
-std::shared_ptr<BStarTreeNode> ASFBStarTree::getRoot() const {
+shared_ptr<BStarTreeNode> ASFBStarTree::getRoot() const {
     return root;
 }
 
 /**
  * Gets all modules in the symmetry group
  */
-const std::map<std::string, std::shared_ptr<Module>>& ASFBStarTree::getModules() const {
+const map<string, shared_ptr<Module>>& ASFBStarTree::getModules() const {
     return modules;
 }
 
-/**
- * Gets the symmetry group
- */
-std::shared_ptr<SymmetryGroup> ASFBStarTree::getSymmetryGroup() const {
+shared_ptr<SymmetryGroup> ASFBStarTree::getSymmetryGroup() const {
     return symmetryGroup;
 }
 
-/**
- * Gets the position of the symmetry axis
- */
 double ASFBStarTree::getSymmetryAxisPosition() const {
     return symmetryAxisPosition;
+}
+
+string ASFBStarTree::getRepresentative(const string& moduleName) const {
+    auto it = representativeMap.find(moduleName);
+    if (it == representativeMap.end()) return "";
+    
+    return it->second;
 }
 
 /**
  * Checks if a module is a representative
  */
-bool ASFBStarTree::isRepresentative(const std::string& moduleName) const {
+bool ASFBStarTree::isRepresentative(const string& moduleName) const {
     auto it = representativeMap.find(moduleName);
     if (it == representativeMap.end()) return false;
     
@@ -735,24 +733,14 @@ bool ASFBStarTree::isRepresentative(const std::string& moduleName) const {
 }
 
 /**
- * Gets the representative of a module
- */
-std::string ASFBStarTree::getRepresentative(const std::string& moduleName) const {
-    auto it = representativeMap.find(moduleName);
-    if (it == representativeMap.end()) return "";
-    
-    return it->second;
-}
-
-/**
  * Creates a deep copy of this ASF-B*-tree
  */
-std::shared_ptr<ASFBStarTree> ASFBStarTree::clone() const {
-    auto clone = std::make_shared<ASFBStarTree>(symmetryGroup);
+shared_ptr<ASFBStarTree> ASFBStarTree::clone() const {
+    auto clone = make_shared<ASFBStarTree>(symmetryGroup);
     
     // Copy modules
     for (const auto& pair : modules) {
-        auto moduleCopy = std::make_shared<Module>(*pair.second);
+        auto moduleCopy = make_shared<Module>(*pair.second);
         clone->modules[pair.first] = moduleCopy;
     }
     
@@ -766,11 +754,11 @@ std::shared_ptr<ASFBStarTree> ASFBStarTree::clone() const {
     
     // Clone the tree structure
     if (root) {
-        std::function<std::shared_ptr<BStarTreeNode>(std::shared_ptr<BStarTreeNode>)> cloneNode;
-        cloneNode = [&cloneNode](std::shared_ptr<BStarTreeNode> node) -> std::shared_ptr<BStarTreeNode> {
+        function<shared_ptr<BStarTreeNode>(shared_ptr<BStarTreeNode>)> cloneNode;
+        cloneNode = [&cloneNode](shared_ptr<BStarTreeNode> node) -> shared_ptr<BStarTreeNode> {
             if (!node) return nullptr;
             
-            auto newNode = std::make_shared<BStarTreeNode>(node->getModuleName());
+            auto newNode = make_shared<BStarTreeNode>(node->getModuleName());
             
             if (node->getLeftChild()) {
                 auto leftChild = cloneNode(node->getLeftChild());
@@ -791,8 +779,8 @@ std::shared_ptr<ASFBStarTree> ASFBStarTree::clone() const {
     }
     
     // Clone contours
-    clone->horizontalContour = std::make_shared<Contour>(*horizontalContour);
-    clone->verticalContour = std::make_shared<Contour>(*verticalContour);
+    clone->horizontalContour = make_shared<Contour>(*horizontalContour);
+    clone->verticalContour = make_shared<Contour>(*verticalContour);
     
     return clone;
 }

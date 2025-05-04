@@ -1,9 +1,4 @@
-/**
- * BStarTreeNode.cpp
- * 
- * Implementation of the BStarTreeNode class for the B*-tree representation
- * used in analog placement with symmetry constraints.
- */
+// BStarTreeNode.cpp
 
 #include "BStarTreeNode.hpp"
 #include <queue>
@@ -18,60 +13,34 @@ BStarTreeNode::BStarTreeNode(const std::string& moduleName)
     // Parent is initialized as empty weak_ptr by default
 }
 
-/**
- * Destructor
- */
 BStarTreeNode::~BStarTreeNode() {
-    // Smart pointers handle memory cleanup
-    // Note: Use weak_ptr for parent to avoid circular reference issues
 }
 
-/**
- * Gets the module name
- */
 std::string BStarTreeNode::getModuleName() const {
     return moduleName;
 }
 
-/**
- * Gets the left child (module to the right)
- */
 std::shared_ptr<BStarTreeNode> BStarTreeNode::getLeftChild() const {
     return leftChild;
 }
 
-/**
- * Gets the right child (module above)
- */
 std::shared_ptr<BStarTreeNode> BStarTreeNode::getRightChild() const {
     return rightChild;
 }
 
-/**
- * Gets the parent node
- */
 std::shared_ptr<BStarTreeNode> BStarTreeNode::getParent() const {
     // Convert weak_ptr to shared_ptr for returning
     return parent.lock();
 }
 
-/**
- * Sets the left child (module to the right)
- */
 void BStarTreeNode::setLeftChild(std::shared_ptr<BStarTreeNode> node) {
     leftChild = node;
 }
 
-/**
- * Sets the right child (module above)
- */
 void BStarTreeNode::setRightChild(std::shared_ptr<BStarTreeNode> node) {
     rightChild = node;
 }
 
-/**
- * Sets the parent node
- */
 void BStarTreeNode::setParent(std::shared_ptr<BStarTreeNode> node) {
     parent = node;  // Automatically converts to weak_ptr
 }

@@ -13,40 +13,41 @@
 #include <map>
 #include <string>
 #include <utility>
+using namespace std;
 
 
 class ASFBStarTree {
 private:
     // Core tree structure
-    std::shared_ptr<BStarTreeNode> root;
+    shared_ptr<BStarTreeNode> root;
     
     // Module and symmetry information
-    std::map<std::string, std::shared_ptr<Module>> modules;
-    std::shared_ptr<SymmetryGroup> symmetryGroup;
+    map<string, shared_ptr<Module>> modules;
+    shared_ptr<SymmetryGroup> symmetryGroup;
     
     // Track representatives for symmetry pairs and self-symmetric modules
-    std::map<std::string, std::string> representativeMap;  // Maps module to its representative
-    std::map<std::string, std::string> symmetricPairMap;   // Maps a module to its symmetric pair
-    std::vector<std::string> selfSymmetricModules;         // List of self-symmetric modules
+    map<string, string> representativeMap;  // Maps module to its representative
+    map<string, string> symmetricPairMap;   // Maps a module to its symmetric pair
+    vector<string> selfSymmetricModules;         // List of self-symmetric modules
     
     // Contour structure for packing
-    std::shared_ptr<Contour> horizontalContour;
-    std::shared_ptr<Contour> verticalContour;
+    shared_ptr<Contour> horizontalContour;
+    shared_ptr<Contour> verticalContour;
     
     // Symmetry axis position
     double symmetryAxisPosition;
     
     // Internal helper methods
-    bool isOnBoundary(const std::string& moduleName) const;
-    bool canMoveNode(const std::shared_ptr<BStarTreeNode>& node, 
-                     const std::shared_ptr<BStarTreeNode>& newParent, 
+    bool isOnBoundary(const string& moduleName) const;
+    bool canMoveNode(const shared_ptr<BStarTreeNode>& node, 
+                     const shared_ptr<BStarTreeNode>& newParent, 
                      bool asLeftChild) const;
     void updateRepresentatives();
     
     // Packing helpers
     void initializeContours();
-    void updateContourWithModule(const std::shared_ptr<Module>& module);
-    void packNode(const std::shared_ptr<BStarTreeNode>& node);
+    void updateContourWithModule(const shared_ptr<Module>& module);
+    void packNode(const shared_ptr<BStarTreeNode>& node);
     void calculateSymmetricModulePositions();
     
 public:
@@ -55,10 +56,10 @@ public:
      * 
      * @param symmetryGroup The symmetry group to be modeled by this ASF-B*-tree
      */
-    ASFBStarTree(std::shared_ptr<SymmetryGroup> symmetryGroup);
+    ASFBStarTree(shared_ptr<SymmetryGroup> symmetryGroup);
     ~ASFBStarTree();
     
-    void addModule(std::shared_ptr<Module> module); // Adds a module to the tree
+    void addModule(shared_ptr<Module> module); // Adds a module to the tree
     
     // Constructs an initial ASF-B*-tree based on the symmetry group
     void constructInitialTree(); 
@@ -90,7 +91,7 @@ public:
      * 
      * @return Horizontal and vertical contours of the symmetry island
      */
-    std::pair<std::shared_ptr<Contour>, std::shared_ptr<Contour>> getContours() const;
+    pair<shared_ptr<Contour>, shared_ptr<Contour>> getContours() const;
     
     // Perturbation operations for simulated annealing
     
@@ -100,7 +101,7 @@ public:
      * @param moduleName Name of the module to rotate
      * @return True if rotation was successful, false otherwise
      */
-    bool rotateModule(const std::string& moduleName);
+    bool rotateModule(const string& moduleName);
     
     /**
      * Moves a node to a new position in the tree
@@ -110,8 +111,8 @@ public:
      * @param asLeftChild True if the node should be the left child, false for right child
      * @return True if the move was successful, false otherwise
      */
-    bool moveNode(const std::string& nodeName, 
-                 const std::string& newParentName, 
+    bool moveNode(const string& nodeName, 
+                 const string& newParentName, 
                  bool asLeftChild);
     
     /**
@@ -121,7 +122,7 @@ public:
      * @param nodeName2 Name of the second node
      * @return True if the swap was successful, false otherwise
      */
-    bool swapNodes(const std::string& nodeName1, const std::string& nodeName2);
+    bool swapNodes(const string& nodeName1, const string& nodeName2);
     
     /**
      * Changes the representative of a symmetry pair
@@ -129,7 +130,7 @@ public:
      * @param pairName Name of the symmetry pair
      * @return True if the change was successful, false otherwise
      */
-    bool changeRepresentative(const std::string& moduleName);
+    bool changeRepresentative(const string& moduleName);
     
     /**
      * Converts the symmetry type (vertical to horizontal or vice versa)
@@ -145,21 +146,21 @@ public:
      * 
      * @return Root node
      */
-    std::shared_ptr<BStarTreeNode> getRoot() const;
+    shared_ptr<BStarTreeNode> getRoot() const;
     
     /**
      * Gets all modules in the symmetry group
      * 
      * @return Map of module names to modules
      */
-    const std::map<std::string, std::shared_ptr<Module>>& getModules() const;
+    const map<string, shared_ptr<Module>>& getModules() const;
     
     /**
      * Gets the symmetry group
      * 
      * @return Symmetry group
      */
-    std::shared_ptr<SymmetryGroup> getSymmetryGroup() const;
+    shared_ptr<SymmetryGroup> getSymmetryGroup() const;
     
     /**
      * Gets the position of the symmetry axis
@@ -174,14 +175,14 @@ public:
      * @param moduleName Name of the module to check
      * @return True if the module is a representative, false otherwise
      */
-    bool isRepresentative(const std::string& moduleName) const;
+    bool isRepresentative(const string& moduleName) const;
     
     /**
      * Gets the representative of a module
      * 
      * @return Name of the representative module
      */
-    std::string getRepresentative(const std::string& moduleName) const;
+    string getRepresentative(const string& moduleName) const;
     
-    std::shared_ptr<ASFBStarTree> clone() const;
+    shared_ptr<ASFBStarTree> clone() const;
 };
