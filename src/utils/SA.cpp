@@ -24,14 +24,14 @@ bool SimulatedAnnealing::checkTimeout() const {
 SimulatedAnnealing::SimulatedAnnealing(shared_ptr<HBStarTree> initialSolution,
                                      double initialTemp,
                                      double finalTemp,
-                                     double coolingRate,
+                                     double coolRate,
                                      int iterations,
                                      int noImprovementLimit)
     : currentSolution(initialSolution),
       bestSolution(nullptr),
       initialTemperature(initialTemp),
       finalTemperature(finalTemp),
-      coolingRate(coolingRate),
+      coolingRate(coolRate),
       iterationsPerTemperature(iterations),
       noImprovementLimit(noImprovementLimit),
       uniformDist(0.0, 1.0),
@@ -47,7 +47,9 @@ SimulatedAnnealing::SimulatedAnnealing(shared_ptr<HBStarTree> initialSolution,
       areaWeight(1.0),
       wirelengthWeight(0.0),
       startTime(chrono::steady_clock::now()),
-      timeoutSeconds(0) {
+      timeoutSeconds(0),
+      adaptivePerturbation(0.3, 0.3, 0.3, 0.05, 0.05),
+      lastOperation("") {
     
     // Initialize random number generator with current time
     rng.seed(static_cast<unsigned int>(time(nullptr)));
@@ -117,20 +119,40 @@ bool SimulatedAnnealing::perturb() {
     if (checkTimeout()) {
         throw runtime_error("Timeout during perturbation");
     }
-    // Choose perturbation type based on probabilities
-    double randVal = uniformDist(rng);
     
-    if (randVal < probRotate) {
-        return perturbRotate();
-    } else if (randVal < probRotate + probMove) {
-        return perturbMove();
-    } else if (randVal < probRotate + probMove + probSwap) {
-        return perturbSwap();
-    } else if (randVal < probRotate + probMove + probSwap + probChangeRepresentative) {
-        return perturbChangeRepresentative();
+    // Choose perturbation type based on adaptive probabilities
+    double randVal = uniformDist(rng);
+    bool result = false;
+    
+    if (randVal < adaptivePerturbation.getRotateProbability()) {
+        lastOperation = "rotate";
+        adaptivePerturbation.recordAttempt(lastOperation);
+        result = perturbRotate();
+    } else if (randVal < adaptivePerturbation.getRotateProbability() + 
+                        adaptivePerturbation.getMoveProbability()) {
+        lastOperation = "move";
+        adaptivePerturbation.recordAttempt(lastOperation);
+        result = perturbMove();
+    } else if (randVal < adaptivePerturbation.getRotateProbability() + 
+                        adaptivePerturbation.getMoveProbability() + 
+                        adaptivePerturbation.getSwapProbability()) {
+        lastOperation = "swap";
+        adaptivePerturbation.recordAttempt(lastOperation);
+        result = perturbSwap();
+    } else if (randVal < adaptivePerturbation.getRotateProbability() + 
+                        adaptivePerturbation.getMoveProbability() + 
+                        adaptivePerturbation.getSwapProbability() + 
+                        adaptivePerturbation.getChangeRepProbability()) {
+        lastOperation = "changeRep";
+        adaptivePerturbation.recordAttempt(lastOperation);
+        result = perturbChangeRepresentative();
     } else {
-        return perturbConvertSymmetryType();
+        lastOperation = "convertSym";
+        adaptivePerturbation.recordAttempt(lastOperation);
+        result = perturbConvertSymmetryType();
     }
+    
+    return result;
 }
 
 /**
@@ -335,6 +357,11 @@ shared_ptr<HBStarTree> SimulatedAnnealing::run() {
                         currentCost = newCost;
                         acceptedMoves++;
                         
+                        // Record success and improvement for adaptive perturbation
+                        if (costDifference < 0) {
+                            adaptivePerturbation.recordSuccess(lastOperation, -costDifference);
+                        }
+                        
                         // Update best solution if improved
                         if (newCost < bestCost) {
                             bestSolution = currentSolution->clone();
@@ -351,6 +378,11 @@ shared_ptr<HBStarTree> SimulatedAnnealing::run() {
                     }
                     
                     totalIterations++;
+                    
+                    // Update perturbation probabilities periodically
+                    if (totalIterations % 100 == 0) {
+                        adaptivePerturbation.updateProbabilities();
+                    }
                 } 
                 catch (const runtime_error& e) {
                     if (string(e.what()).find("Timeout") != string::npos) {
@@ -372,12 +404,26 @@ shared_ptr<HBStarTree> SimulatedAnnealing::run() {
             // Cool down
             temperature *= coolingRate;
             
-            // Print progress
-            cout << "Temperature: " << temperature 
-                    << ", Best cost: " << bestCost 
-                    << ", Current cost: " << currentCost 
-                    << ", No improvement: " << noImprovementCount 
-                    << endl;
+            // Print progress including adaptive perturbation statistics every 5 temperature steps
+            static int tempSteps = 0;
+            tempSteps++;
+            
+            if (tempSteps % 5 == 0) {
+                cout << "Temperature: " << temperature 
+                     << ", Best cost: " << bestCost 
+                     << ", Current cost: " << currentCost 
+                     << ", No improvement: " << noImprovementCount 
+                     << endl;
+                
+                // Print adaptive perturbation statistics
+                adaptivePerturbation.printStats();
+            } else {
+                cout << "Temperature: " << temperature 
+                     << ", Best cost: " << bestCost 
+                     << ", Current cost: " << currentCost 
+                     << ", No improvement: " << noImprovementCount 
+                     << endl;
+            }
         }
         
         // Return the best solution found

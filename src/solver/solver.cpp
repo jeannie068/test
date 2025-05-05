@@ -65,8 +65,8 @@ void PlacementSolver::createInitialSolution() {
         return;
     }
     
-    // Construct an initial HB*-tree
-    hbTree->constructInitialTree();
+    // Construct an improved initial HB*-tree - Use the new method instead of constructInitialTree
+    hbTree->constructImprovedInitialTree();
     
     // Pack the tree to get initial coordinates
     hbTree->pack();
@@ -156,11 +156,17 @@ bool PlacementSolver::solve() {
     std::cout << "Iterations per temperature: " << iterationsPerTemperature << std::endl;
     std::cout << "No improvement limit: " << noImprovementLimit << std::endl;
     
-    // Create the simulated annealing solver
-    SimulatedAnnealing sa(hbTree, initialTemperature, finalTemperature, coolingRate,
-                         iterationsPerTemperature, noImprovementLimit);
+    // Create the simulated annealing solver with optimized parameters
+    SimulatedAnnealing sa(hbTree, 
+                          1000.0,     // Initial temperature
+                          1.0,        // Higher final temperature to stop earlier
+                          0.85,       // More aggressive cooling
+                          250,        // More iterations at high temperatures
+                          500);       // Lower no improvement limit
     
-    sa.setPerturbationProbabilities(probRotate, probMove, probSwap, probChangeRep, probConvertSym);
+    // Let the adaptive perturbation handle probabilities
+    // These are just initial values that will be tuned during the SA process
+    sa.setPerturbationProbabilities(0.3, 0.4, 0.2, 0.05, 0.05);
     sa.setCostWeights(areaWeight, wirelengthWeight);
     sa.setSeed(randomSeed);
     

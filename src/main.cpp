@@ -66,10 +66,10 @@ int main(int argc, char* argv[]) {
     // Configure solver parameters
     solver.setAnnealingParameters(
         1000.0,     // Initial temperature
-        0.1,        // Final temperature
-        0.95,       // Cooling rate
-        100,        // Iterations per temperature
-        1000        // No improvement limit
+        1.0,        // Final temperature
+        0.85,       // Cooling rate
+        250,        // Iterations per temperature
+        500        // No improvement limit
     );
     
     solver.setPerturbationProbabilities(

@@ -66,6 +66,7 @@ private:
     // NEW: Partial repacking methods
     void markSubtreeForRepack(shared_ptr<HBStarTreeNode> node);
     void repackAffectedSubtrees();
+    void updateContourForSubtree(shared_ptr<HBStarTreeNode> node);
     void packSubtree(shared_ptr<HBStarTreeNode> node);
     
     // NEW: Helper to register nodes in lookup maps
@@ -85,6 +86,7 @@ public:
     
     // Constructs an initial HB*-tree
     void constructInitialTree();
+    void constructImprovedInitialTree();
     
     /**
      * Calculates the coordinates of all modules by packing the HB*-tree

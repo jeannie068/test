@@ -331,3 +331,163 @@ bool HBStarTree::validateSymmetryIslandPlacement() const {
     
     return true;
 }
+
+/**
+ * Repack only the affected subtrees
+ */
+void HBStarTree::repackAffectedSubtrees() {
+    if (modifiedSubtrees.empty()) return;
+    
+    // Reset contours
+    horizontalContour->clear();
+    verticalContour->clear();
+    
+    // Initialize horizontal contour with a segment at y=0
+    horizontalContour->addSegment(0, std::numeric_limits<int>::max(), 0);
+    
+    // Initialize vertical contour with a segment at x=0
+    verticalContour->addSegment(0, std::numeric_limits<int>::max(), 0);
+    
+    // Use a map to efficiently track nodes by their height in the tree
+    unordered_map<shared_ptr<HBStarTreeNode>, int> nodeDepths;
+    vector<shared_ptr<HBStarTreeNode>> rootsToRepack;
+    
+    // Calculate depths and find roots in one pass
+    for (const auto& node : modifiedSubtrees) {
+        // Skip if already processed
+        if (nodeDepths.find(node) != nodeDepths.end()) continue;
+        
+        // Calculate depth and check if it's a root
+        int depth = 0;
+        bool isRoot = true;
+        auto parent = node->getParent();
+        auto current = parent;
+        
+        while (current) {
+            depth++;
+            // If any ancestor is also modified, this is not a root
+            if (modifiedSubtrees.find(current) != modifiedSubtrees.end()) {
+                isRoot = false;
+                break;
+            }
+            current = current->getParent();
+        }
+        
+        nodeDepths[node] = depth;
+        
+        if (isRoot) {
+            rootsToRepack.push_back(node);
+        }
+    }
+    
+    // Sort by depth (deeper nodes first)
+    sort(rootsToRepack.begin(), rootsToRepack.end(), 
+         [&nodeDepths](const shared_ptr<HBStarTreeNode>& a, const shared_ptr<HBStarTreeNode>& b) {
+             return nodeDepths[a] > nodeDepths[b];
+         });
+    
+    // Now we need to consider the placement order more carefully
+    // Pack the tree in a bottom-up manner
+    
+    // First, check if the root node itself is modified
+    bool rootModified = false;
+    for (const auto& node : modifiedSubtrees) {
+        if (node == root) {
+            rootModified = true;
+            break;
+        }
+    }
+    
+    if (rootModified) {
+        // If root is modified, pack the entire tree
+        packSubtree(root);
+    } else {
+        // Otherwise, pack only the modified subtrees
+        for (const auto& node : rootsToRepack) {
+            // Make sure to update contours with any already placed nodes above this subtree
+            updateContourForSubtree(node);
+            
+            // Now pack the subtree
+            packSubtree(node);
+        }
+    }
+    
+    // Calculate total area
+    int minX = std::numeric_limits<int>::max(), minY = std::numeric_limits<int>::max();
+    int maxX = 0, maxY = 0;
+    
+    for (const auto& pair : modules) {
+        const auto& module = pair.second;
+        minX = std::min(minX, module->getX());
+        minY = std::min(minY, module->getY());
+        maxX = std::max(maxX, module->getX() + module->getWidth());
+        maxY = std::max(maxY, module->getY() + module->getHeight());
+    }
+    
+    // Update total area
+    totalArea = (maxX - minX) * (maxY - minY);
+    
+    // Update contour nodes
+    updateContourNodes();
+    
+    // Clear the modified set
+    modifiedSubtrees.clear();
+}
+
+void HBStarTree::updateContourForSubtree(shared_ptr<HBStarTreeNode> node) {
+    if (!node) return;
+    
+    // Start from root and add all modules to contour until we reach this node
+    queue<shared_ptr<HBStarTreeNode>> nodeQueue;
+    nodeQueue.push(root);
+    
+    while (!nodeQueue.empty()) {
+        auto current = nodeQueue.front();
+        nodeQueue.pop();
+        
+        // Skip this subtree
+        if (current == node) continue;
+        
+        // Process this node
+        if (current->getType() == HBNodeType::MODULE) {
+            const string& moduleName = current->getModuleName();
+            auto module = modules[moduleName];
+            
+            if (module) {
+                // Update contours with this module
+                int x = module->getX();
+                int y = module->getY();
+                int width = module->getWidth();
+                int height = module->getHeight();
+                
+                horizontalContour->addSegment(x, x + width, y + height);
+                verticalContour->addSegment(y, y + height, x + width);
+            }
+        } else if (current->getType() == HBNodeType::HIERARCHY) {
+            auto asfTree = current->getASFTree();
+            
+            if (asfTree) {
+                // Update contours with all modules in this symmetry island
+                for (const auto& pair : asfTree->getModules()) {
+                    const auto& module = pair.second;
+                    
+                    int x = module->getX();
+                    int y = module->getY();
+                    int width = module->getWidth();
+                    int height = module->getHeight();
+                    
+                    horizontalContour->addSegment(x, x + width, y + height);
+                    verticalContour->addSegment(y, y + height, x + width);
+                }
+            }
+        }
+        
+        // Enqueue children
+        if (current->getLeftChild() && current->getLeftChild() != node) {
+            nodeQueue.push(current->getLeftChild());
+        }
+        if (current->getRightChild() && current->getRightChild() != node) {
+            nodeQueue.push(current->getRightChild());
+        }
+    }
+}

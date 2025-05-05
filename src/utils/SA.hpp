@@ -9,6 +9,7 @@
 #include <string>
 #include "../data_struct/HBStarTree.hpp"
 #include "../utils/TimeoutManager.hpp"
+#include "../utils/AdaptivePerturbation.hpp"
 
 class SimulatedAnnealing {
 private:
@@ -57,6 +58,12 @@ private:
     chrono::seconds timeoutSeconds;
     std::shared_ptr<TimeoutManager> timeoutManager;
     bool checkTimeout() const;
+
+    // Adaptive perturbation system
+    AdaptivePerturbation adaptivePerturbation;
+    
+    // Track last operation for statistics
+    std::string lastOperation;
     
     /**
      * Calculates the cost of a solution

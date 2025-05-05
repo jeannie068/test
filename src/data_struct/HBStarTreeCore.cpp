@@ -195,6 +195,225 @@ void HBStarTree::constructInitialTree() {
     }
 }
 
+void HBStarTree::constructImprovedInitialTree() {
+    // Clear any existing tree
+    clearTree();
+    
+    // First, construct symmetry islands for each symmetry group
+    constructSymmetryIslands();
+    
+    // Collect all non-symmetry modules
+    vector<string> nonSymmetryModules;
+    
+    // Create a set of all modules in symmetry groups
+    set<string> symmetryModules;
+    for (const auto& group : symmetryGroups) {
+        for (const auto& pair : group->getSymmetryPairs()) {
+            symmetryModules.insert(pair.first);
+            symmetryModules.insert(pair.second);
+        }
+        for (const auto& moduleName : group->getSelfSymmetric()) {
+            symmetryModules.insert(moduleName);
+        }
+    }
+    
+    // Find non-symmetry modules
+    for (const auto& pair : modules) {
+        if (symmetryModules.find(pair.first) == symmetryModules.end()) {
+            nonSymmetryModules.push_back(pair.first);
+        }
+    }
+    
+    // Sort symmetry groups by area (largest first)
+    vector<pair<string, int>> sortedGroups;
+    for (const auto& group : symmetryGroups) {
+        int totalArea = 0;
+        
+        // Calculate total area of all modules in this group
+        for (const auto& pair : group->getSymmetryPairs()) {
+            if (modules.find(pair.first) != modules.end()) {
+                totalArea += modules[pair.first]->getArea();
+            }
+            if (modules.find(pair.second) != modules.end()) {
+                totalArea += modules[pair.second]->getArea();
+            }
+        }
+        
+        for (const auto& moduleName : group->getSelfSymmetric()) {
+            if (modules.find(moduleName) != modules.end()) {
+                totalArea += modules[moduleName]->getArea();
+            }
+        }
+        
+        sortedGroups.push_back(make_pair(group->getName(), totalArea));
+    }
+    
+    sort(sortedGroups.begin(), sortedGroups.end(),
+         [](const pair<string, int>& a, const pair<string, int>& b) {
+             return a.second > b.second;  // Descending order by area
+         });
+    
+    // Sort non-symmetry modules using a more sophisticated approach
+    sort(nonSymmetryModules.begin(), nonSymmetryModules.end(), 
+         [this](const string& a, const string& b) {
+             auto moduleA = modules[a];
+             auto moduleB = modules[b];
+             
+             // Primary sort by area (larger first)
+             if (abs(moduleA->getArea() - moduleB->getArea()) > 100) {
+                 return moduleA->getArea() > moduleB->getArea();
+             }
+             
+             // Secondary sort by aspect ratio (closer to 1.0 first)
+             double aspectRatioA = static_cast<double>(moduleA->getWidth()) / moduleA->getHeight();
+             if (aspectRatioA < 1.0) aspectRatioA = 1.0 / aspectRatioA;  // Make it > 1.0
+             
+             double aspectRatioB = static_cast<double>(moduleB->getWidth()) / moduleB->getHeight();
+             if (aspectRatioB < 1.0) aspectRatioB = 1.0 / aspectRatioB;  // Make it > 1.0
+             
+             return aspectRatioA < aspectRatioB;  // Lower aspect ratio (closer to 1.0) first
+         });
+    
+    // Create a balanced initial tree rather than left-skewed
+    if (!sortedGroups.empty()) {
+        // Start with largest symmetry group as root
+        root = symmetryGroupNodes[sortedGroups[0].first];
+        
+        // Create a balanced tree with symmetry groups
+        if (sortedGroups.size() > 1) {
+            // We'll use a binary tree construction approach
+            queue<shared_ptr<HBStarTreeNode>> nodeQueue;
+            nodeQueue.push(root);
+            
+            for (size_t i = 1; i < sortedGroups.size(); i++) {
+                auto current = nodeQueue.front();
+                nodeQueue.pop();
+                
+                auto node = symmetryGroupNodes[sortedGroups[i].first];
+                
+                // Try to place as left child first
+                if (!current->getLeftChild()) {
+                    current->setLeftChild(node);
+                    node->setParent(current);
+                    nodeQueue.push(node);
+                }
+                // Then try right child
+                else if (!current->getRightChild()) {
+                    current->setRightChild(node);
+                    node->setParent(current);
+                    nodeQueue.push(node);
+                } 
+                // If both children exist, put back in queue and continue
+                else {
+                    nodeQueue.push(current);
+                    i--; // Try again with same node
+                }
+            }
+        }
+        
+        // Now add non-symmetry modules to the tree
+        if (!nonSymmetryModules.empty()) {
+            // Find the leaf nodes where we can attach non-symmetry modules
+            vector<shared_ptr<HBStarTreeNode>> leaves;
+            queue<shared_ptr<HBStarTreeNode>> nodeQueue;
+            nodeQueue.push(root);
+            
+            while (!nodeQueue.empty()) {
+                auto current = nodeQueue.front();
+                nodeQueue.pop();
+                
+                bool isLeaf = true;
+                
+                if (current->getLeftChild()) {
+                    nodeQueue.push(current->getLeftChild());
+                    isLeaf = false;
+                }
+                
+                if (current->getRightChild()) {
+                    nodeQueue.push(current->getRightChild());
+                    isLeaf = false;
+                }
+                
+                if (isLeaf) {
+                    leaves.push_back(current);
+                }
+            }
+            
+            // Distribute non-symmetry modules among leaves
+            size_t leafIndex = 0;
+            for (const auto& moduleName : nonSymmetryModules) {
+                auto node = make_shared<HBStarTreeNode>(HBNodeType::MODULE, moduleName);
+                moduleNodes[moduleName] = node;
+                
+                // Get current leaf
+                auto current = leaves[leafIndex];
+                
+                // Try to place as left child first
+                if (!current->getLeftChild()) {
+                    current->setLeftChild(node);
+                    node->setParent(current);
+                }
+                // Then try right child
+                else if (!current->getRightChild()) {
+                    current->setRightChild(node);
+                    node->setParent(current);
+                    
+                    // Move to next leaf for balance
+                    leafIndex = (leafIndex + 1) % leaves.size();
+                }
+                // If both children exist, add node to leaves and continue
+                else {
+                    leaves.push_back(node);
+                    
+                    // Move to next leaf
+                    leafIndex = (leafIndex + 1) % (leaves.size() - 1);
+                }
+            }
+        }
+    }
+    // If no symmetry groups, start with non-symmetry modules
+    else if (!nonSymmetryModules.empty()) {
+        auto node = make_shared<HBStarTreeNode>(HBNodeType::MODULE, nonSymmetryModules[0]);
+        moduleNodes[nonSymmetryModules[0]] = node;
+        root = node;
+        
+        // Create a balanced tree with non-symmetry modules
+        queue<shared_ptr<HBStarTreeNode>> nodeQueue;
+        nodeQueue.push(root);
+        
+        for (size_t i = 1; i < nonSymmetryModules.size(); i++) {
+            auto current = nodeQueue.front();
+            nodeQueue.pop();
+            
+            auto node = make_shared<HBStarTreeNode>(HBNodeType::MODULE, nonSymmetryModules[i]);
+            moduleNodes[nonSymmetryModules[i]] = node;
+            
+            // Try to place as left child first
+            if (!current->getLeftChild()) {
+                current->setLeftChild(node);
+                node->setParent(current);
+                nodeQueue.push(node);
+            }
+            // Then try right child
+            else if (!current->getRightChild()) {
+                current->setRightChild(node);
+                node->setParent(current);
+                nodeQueue.push(node);
+            } 
+            // If both children exist, put back in queue and continue
+            else {
+                nodeQueue.push(current);
+                i--; // Try again with same node
+            }
+        }
+    }
+    
+    // Register all nodes in lookup maps
+    if (root) {
+        registerNodeInMap(root);
+    }
+}
+
 /**
  * 
  * Implementation of perturbation operations for the HBStarTree class.
@@ -625,56 +844,3 @@ void HBStarTree::markSubtreeForRepack(shared_ptr<HBStarTreeNode> node) {
     }
 }
 
-/**
- * Repack only the affected subtrees
- */
-void HBStarTree::repackAffectedSubtrees() {
-    if (modifiedSubtrees.empty()) return;
-    
-    // Find the highest modified nodes (nodes with no modified ancestors)
-    vector<shared_ptr<HBStarTreeNode>> rootsToRepack;
-    
-    for (const auto& node : modifiedSubtrees) {
-        bool isRoot = true;
-        auto parent = node->getParent();
-        
-        while (parent) {
-            if (modifiedSubtrees.find(parent) != modifiedSubtrees.end()) {
-                isRoot = false;
-                break;
-            }
-            parent = parent->getParent();
-        }
-        
-        if (isRoot) {
-            rootsToRepack.push_back(node);
-        }
-    }
-    
-    // Sort by tree depth to repack lowest nodes first
-    sort(rootsToRepack.begin(), rootsToRepack.end(), 
-        [](const shared_ptr<HBStarTreeNode>& a, const shared_ptr<HBStarTreeNode>& b) {
-            int depthA = 0, depthB = 0;
-            auto currA = a, currB = b;
-            
-            while (currA->getParent()) {
-                depthA++;
-                currA = currA->getParent();
-            }
-            
-            while (currB->getParent()) {
-                depthB++;
-                currB = currB->getParent();
-            }
-            
-            return depthA > depthB;
-        });
-    
-    // Repack each subtree
-    for (const auto& node : rootsToRepack) {
-        packSubtree(node);
-    }
-    
-    // Clear the modified set
-    modifiedSubtrees.clear();
-}
