@@ -23,10 +23,12 @@ HBStarTree::HBStarTree()
       verticalContour(make_shared<Contour>()),
       totalArea(0),
       isPacked(false) {
+    // Node maps initialized as empty
 }
 
 HBStarTree::~HBStarTree() {
-
+    // Clear lookup maps
+    nodeMap.clear();
 }
 
 /* Add a module to the tree */
@@ -170,6 +172,11 @@ void HBStarTree::constructInitialTree() {
     
     // Then, construct the initial tree structure
     constructInitialTreeStructure();
+    
+    // Register all nodes in lookup maps
+    if (root) {
+        registerNodeInMap(root);
+    }
 }
 
 /**
@@ -339,203 +346,36 @@ bool HBStarTree::validateSymmetryIslandPlacement() const {
 bool HBStarTree::pack() {
     if (!root) return false;
     
+    // If there are modified subtrees, only repack those
+    if (!modifiedSubtrees.empty()) {
+        repackAffectedSubtrees();
+        return true;
+    }
+    
     // Reset contours
     horizontalContour->clear();
     verticalContour->clear();
     
     // Initialize horizontal contour with a segment at y=0
-    horizontalContour->addSegment(0, numeric_limits<int>::max(), 0);
+    horizontalContour->addSegment(0, std::numeric_limits<int>::max(), 0);
     
     // Initialize vertical contour with a segment at x=0
-    verticalContour->addSegment(0, numeric_limits<int>::max(), 0);
+    verticalContour->addSegment(0, std::numeric_limits<int>::max(), 0);
     
-    // Pack the tree in pre-order (DFS)
-    stack<shared_ptr<HBStarTreeNode>> nodeStack;
-    nodeStack.push(root);
-    
-    int maxX = 0, maxY = 0;
-    
-    while (!nodeStack.empty()) {
-        auto currentNode = nodeStack.top();
-        nodeStack.pop();
-        
-        if (!currentNode) continue;
-        
-        switch (currentNode->getType()) {
-            case HBNodeType::MODULE: {
-                // Pack a regular module
-                const string& moduleName = currentNode->getModuleName();
-                auto module = modules[moduleName];
-                
-                if (!module) continue;
-                
-                int x = 0, y = 0;
-                
-                // Calculate x-coordinate based on B*-tree rules
-                if (currentNode->getParent()) {
-                    if (currentNode->getParent()->getLeftChild() == currentNode) {
-                        // Left child: place to the right of parent
-                        if (currentNode->getParent()->getType() == HBNodeType::MODULE) {
-                            auto parentModule = modules[currentNode->getParent()->getModuleName()];
-                            if (parentModule) {
-                                x = parentModule->getX() + parentModule->getWidth();
-                            }
-                        } else if (currentNode->getParent()->getType() == HBNodeType::HIERARCHY) {
-                            // This is more complex - need to get the rightmost x-coordinate of the symmetry island
-                            auto asfTree = currentNode->getParent()->getASFTree();
-                            if (asfTree) {
-                                // Use the symmetry axis position as a simple approximation
-                                x = static_cast<int>(asfTree->getSymmetryAxisPosition());
-                            }
-                        } else if (currentNode->getParent()->getType() == HBNodeType::CONTOUR) {
-                            // Place to the right of the contour segment
-                            int x1, y1, x2, y2;
-                            currentNode->getParent()->getContour(x1, y1, x2, y2);
-                            x = x2;
-                        }
-                    } else {
-                        // Right child: same x-coordinate as parent
-                        if (currentNode->getParent()->getType() == HBNodeType::MODULE) {
-                            auto parentModule = modules[currentNode->getParent()->getModuleName()];
-                            if (parentModule) {
-                                x = parentModule->getX();
-                            }
-                        } else if (currentNode->getParent()->getType() == HBNodeType::HIERARCHY) {
-                            // Place at the left boundary of the symmetry island
-                            // For simplicity, use x=0 for now
-                            x = 0;
-                        } else if (currentNode->getParent()->getType() == HBNodeType::CONTOUR) {
-                            // Place at the left boundary of the contour segment
-                            int x1, y1, x2, y2;
-                            currentNode->getParent()->getContour(x1, y1, x2, y2);
-                            x = x1;
-                        }
-                    }
-                }
-                
-                // Calculate y-coordinate using the horizontal contour
-                y = horizontalContour->getHeight(x, x + module->getWidth());
-                
-                // Set the module's position
-                module->setPosition(x, y);
-                
-                // Update contours
-                horizontalContour->addSegment(x, x + module->getWidth(), y + module->getHeight());
-                verticalContour->addSegment(y, y + module->getHeight(), x + module->getWidth());
-                
-                // Update maximum coordinates
-                maxX = max(maxX, x + module->getWidth());
-                maxY = max(maxY, y + module->getHeight());
-                
-                break;
-            }
-            case HBNodeType::HIERARCHY: {
-                // Pack a symmetry island
-                auto asfTree = currentNode->getASFTree();
-                if (!asfTree) continue;
-                
-                // Pack the ASF-B*-tree
-                asfTree->pack();
-                
-                // Get the bounding rectangle of the symmetry island
-                int minX = numeric_limits<int>::max();
-                int minY = numeric_limits<int>::max();
-                int symMaxX = 0;
-                int symMaxY = 0;
-                
-                for (const auto& pair : asfTree->getModules()) {
-                    const auto& module = pair.second;
-                    
-                    minX = min(minX, module->getX());
-                    minY = min(minY, module->getY());
-                    symMaxX = max(symMaxX, module->getX() + module->getWidth());
-                    symMaxY = max(symMaxY, module->getY() + module->getHeight());
-                }
-                
-                // Calculate the position for the symmetry island
-                int x = 0, y = 0;
-                
-                // Calculate x-coordinate based on B*-tree rules
-                if (currentNode->getParent()) {
-                    if (currentNode->getParent()->getLeftChild() == currentNode) {
-                        // Left child: place to the right of parent
-                        if (currentNode->getParent()->getType() == HBNodeType::MODULE) {
-                            auto parentModule = modules[currentNode->getParent()->getModuleName()];
-                            if (parentModule) {
-                                x = parentModule->getX() + parentModule->getWidth();
-                            }
-                        } else if (currentNode->getParent()->getType() == HBNodeType::HIERARCHY) {
-                            // This is more complex - need to get the rightmost x-coordinate of the parent symmetry island
-                            auto parentAsfTree = currentNode->getParent()->getASFTree();
-                            if (parentAsfTree) {
-                                // Use the symmetry axis position as a simple approximation
-                                x = static_cast<int>(parentAsfTree->getSymmetryAxisPosition());
-                            }
-                        } else if (currentNode->getParent()->getType() == HBNodeType::CONTOUR) {
-                            // Place to the right of the contour segment
-                            int x1, y1, x2, y2;
-                            currentNode->getParent()->getContour(x1, y1, x2, y2);
-                            x = x2;
-                        }
-                    } else {
-                        // Right child: same x-coordinate as parent
-                        if (currentNode->getParent()->getType() == HBNodeType::MODULE) {
-                            auto parentModule = modules[currentNode->getParent()->getModuleName()];
-                            if (parentModule) {
-                                x = parentModule->getX();
-                            }
-                        } else if (currentNode->getParent()->getType() == HBNodeType::HIERARCHY) {
-                            // Place at the left boundary of the parent symmetry island
-                            // For simplicity, use x=0 for now
-                            x = 0;
-                        } else if (currentNode->getParent()->getType() == HBNodeType::CONTOUR) {
-                            // Place at the left boundary of the contour segment
-                            int x1, y1, x2, y2;
-                            currentNode->getParent()->getContour(x1, y1, x2, y2);
-                            x = x1;
-                        }
-                    }
-                }
-                
-                // Calculate y-coordinate using the horizontal contour
-                y = horizontalContour->getHeight(x, x + (symMaxX - minX));
-                
-                // Shift all modules in the symmetry island
-                int deltaX = x - minX;
-                int deltaY = y - minY;
-                
-                for (const auto& pair : asfTree->getModules()) {
-                    const auto& module = pair.second;
-                    module->setPosition(module->getX() + deltaX, module->getY() + deltaY);
-                }
-                
-                // Update contours - this is complex for rectilinear symmetry islands
-                // For simplicity, use a rectangular approximation
-                horizontalContour->addSegment(x, x + (symMaxX - minX), y + (symMaxY - minY));
-                verticalContour->addSegment(y, y + (symMaxY - minY), x + (symMaxX - minX));
-                
-                // Update maximum coordinates
-                maxX = max(maxX, x + (symMaxX - minX));
-                maxY = max(maxY, y + (symMaxY - minY));
-                
-                break;
-            }
-            case HBNodeType::CONTOUR: {
-                // Contour nodes don't need to be packed
-                break;
-            }
-        }
-        
-        // Add children to the stack in reverse order (for pre-order traversal)
-        if (currentNode->getRightChild()) {
-            nodeStack.push(currentNode->getRightChild());
-        }
-        if (currentNode->getLeftChild()) {
-            nodeStack.push(currentNode->getLeftChild());
-        }
-    }
+    // Pack the entire tree
+    packSubtree(root);
     
     // Calculate total area
+    int maxX = 0, maxY = 0;
+    
+    // Find the maximum coordinates from all modules
+    for (const auto& pair : modules) {
+        const auto& module = pair.second;
+        maxX = std::max(maxX, module->getX() + module->getWidth());
+        maxY = std::max(maxY, module->getY() + module->getHeight());
+    }
+    
+    // Update total area
     totalArea = maxX * maxY;
     
     // Update contour nodes
@@ -594,15 +434,31 @@ bool HBStarTree::rotateModule(const string& moduleName) {
         
         if (!asfTree) return false;
         
-        return asfTree->rotateModule(moduleName);
+        bool success = asfTree->rotateModule(moduleName);
+        
+        // Mark the symmetry group for repacking
+        markSubtreeForRepack(hierarchyNode);
+        
+        // Repack affected subtrees
+        if (isPacked && success) {
+            repackAffectedSubtrees();
+        }
+        
+        return success;
     }
     
     // Otherwise, just rotate the module directly
     module->rotate();
     
-    // Since the module's dimensions have changed, the tree needs to be repacked
+    // Mark the module's node for repacking
+    auto node = getModuleNode(moduleName);
+    if (node) {
+        markSubtreeForRepack(node);
+    }
+    
+    // Repack affected subtrees
     if (isPacked) {
-        pack();
+        repackAffectedSubtrees();
     }
     
     return true;
@@ -614,37 +470,9 @@ bool HBStarTree::rotateModule(const string& moduleName) {
 bool HBStarTree::moveNode(const string& nodeName, 
                           const string& newParentName, 
                           bool asLeftChild) {
-    // Find the nodes
-    shared_ptr<HBStarTreeNode> node = nullptr;
-    shared_ptr<HBStarTreeNode> newParent = nullptr;
-    
-    // Check if nodeName is a module name
-    auto moduleIt = moduleNodes.find(nodeName);
-    if (moduleIt != moduleNodes.end()) {
-        node = moduleIt->second;
-    }
-    
-    // Check if nodeName is a symmetry group name
-    if (!node) {
-        auto symGroupIt = symmetryGroupNodes.find(nodeName);
-        if (symGroupIt != symmetryGroupNodes.end()) {
-            node = symGroupIt->second;
-        }
-    }
-    
-    // Check if newParentName is a module name
-    auto parentModuleIt = moduleNodes.find(newParentName);
-    if (parentModuleIt != moduleNodes.end()) {
-        newParent = parentModuleIt->second;
-    }
-    
-    // Check if newParentName is a symmetry group name
-    if (!newParent) {
-        auto parentSymGroupIt = symmetryGroupNodes.find(newParentName);
-        if (parentSymGroupIt != symmetryGroupNodes.end()) {
-            newParent = parentSymGroupIt->second;
-        }
-    }
+    // Use direct lookup instead of traversing the tree
+    auto node = findNode(nodeName);
+    auto newParent = findNode(newParentName);
     
     if (!node || !newParent) return false;
     
@@ -656,6 +484,9 @@ bool HBStarTree::moveNode(const string& nodeName,
         } else if (oldParent->getRightChild() == node) {
             oldParent->setRightChild(nullptr);
         }
+        
+        // Mark the oldParent's subtree for repacking
+        markSubtreeForRepack(oldParent);
     } else if (node == root) {
         // The node is the root - find a new root
         if (node->getLeftChild()) {
@@ -671,10 +502,10 @@ bool HBStarTree::moveNode(const string& nodeName,
     // Add the node to its new parent
     node->setParent(newParent);
     if (asLeftChild) {
-        // If there's already a left child, handle it
+        // Handle existing left child
         auto existingChild = newParent->getLeftChild();
         if (existingChild) {
-            // Try to find a place for the existing child
+            // Find a place for the existing child
             if (!node->getLeftChild()) {
                 node->setLeftChild(existingChild);
                 existingChild->setParent(node);
@@ -683,7 +514,6 @@ bool HBStarTree::moveNode(const string& nodeName,
                 existingChild->setParent(node);
             } else {
                 // Both children slots are taken - find another place
-                // This is a simplification - in practice, more sophisticated handling is needed
                 auto current = node->getLeftChild();
                 while (current->getLeftChild()) {
                     current = current->getLeftChild();
@@ -691,13 +521,16 @@ bool HBStarTree::moveNode(const string& nodeName,
                 current->setLeftChild(existingChild);
                 existingChild->setParent(current);
             }
+            
+            // Mark the existing child's subtree for repacking
+            markSubtreeForRepack(existingChild);
         }
         newParent->setLeftChild(node);
     } else {
-        // If there's already a right child, handle it
+        // Handle existing right child
         auto existingChild = newParent->getRightChild();
         if (existingChild) {
-            // Try to find a place for the existing child
+            // Find a place for the existing child
             if (!node->getLeftChild()) {
                 node->setLeftChild(existingChild);
                 existingChild->setParent(node);
@@ -713,13 +546,22 @@ bool HBStarTree::moveNode(const string& nodeName,
                 current->setRightChild(existingChild);
                 existingChild->setParent(current);
             }
+            
+            // Mark the existing child's subtree for repacking
+            markSubtreeForRepack(existingChild);
         }
         newParent->setRightChild(node);
     }
     
-    // Since the tree structure has changed, it needs to be repacked
+    // Mark the newParent's subtree for repacking
+    markSubtreeForRepack(newParent);
+    
+    // Mark the node's subtree for repacking
+    markSubtreeForRepack(node);
+    
+    // Since the tree structure has changed, repack affected subtrees
     if (isPacked) {
-        pack();
+        repackAffectedSubtrees();
     }
     
     return true;
@@ -729,46 +571,22 @@ bool HBStarTree::moveNode(const string& nodeName,
  * Swaps two nodes in the tree
  */
 bool HBStarTree::swapNodes(const string& nodeName1, const string& nodeName2) {
-    // Find the nodes
-    shared_ptr<HBStarTreeNode> node1 = nullptr;
-    shared_ptr<HBStarTreeNode> node2 = nullptr;
-    
-    // Check if nodeName1 is a module name
-    auto moduleIt1 = moduleNodes.find(nodeName1);
-    if (moduleIt1 != moduleNodes.end()) {
-        node1 = moduleIt1->second;
-    }
-    
-    // Check if nodeName1 is a symmetry group name
-    if (!node1) {
-        auto symGroupIt1 = symmetryGroupNodes.find(nodeName1);
-        if (symGroupIt1 != symmetryGroupNodes.end()) {
-            node1 = symGroupIt1->second;
-        }
-    }
-    
-    // Check if nodeName2 is a module name
-    auto moduleIt2 = moduleNodes.find(nodeName2);
-    if (moduleIt2 != moduleNodes.end()) {
-        node2 = moduleIt2->second;
-    }
-    
-    // Check if nodeName2 is a symmetry group name
-    if (!node2) {
-        auto symGroupIt2 = symmetryGroupNodes.find(nodeName2);
-        if (symGroupIt2 != symmetryGroupNodes.end()) {
-            node2 = symGroupIt2->second;
-        }
-    }
+    // Use direct lookup instead of traversing the tree
+    auto node1 = findNode(nodeName1);
+    auto node2 = findNode(nodeName2);
     
     if (!node1 || !node2) return false;
+    
+    // Mark subtrees for repacking
+    markSubtreeForRepack(node1);
+    markSubtreeForRepack(node2);
     
     // Get parents and positions
     auto parent1 = node1->getParent();
     auto parent2 = node2->getParent();
     
-    bool isLeftChild1 = parent1 && parent1->getLeftChild() == node1;
-    bool isLeftChild2 = parent2 && parent2->getLeftChild() == node2;
+    bool isLeftChild1 = node1->isLeftChild();
+    bool isLeftChild2 = node2->isLeftChild();
     
     // Special case: node2 is a child of node1
     if (node1->getLeftChild() == node2 || node1->getRightChild() == node2) {
@@ -915,16 +733,50 @@ bool HBStarTree::swapNodes(const string& nodeName1, const string& nodeName2) {
         }
     }
     
-    // Since the tree structure has changed, it needs to be repacked
+    // Repack affected subtrees
     if (isPacked) {
-        pack();
+        repackAffectedSubtrees();
     }
     
     return true;
 }
 
 /**
+ * Converts the symmetry type of a symmetry group
+ * 
+ * @param symmetryGroupName Name of the symmetry group
+ * @return True if the conversion was successful, false otherwise
+ */
+bool HBStarTree::convertSymmetryType(const string& symmetryGroupName) {
+    // Find the symmetry group
+    auto it = symmetryGroupNodes.find(symmetryGroupName);
+    if (it == symmetryGroupNodes.end()) return false;
+    
+    auto hierarchyNode = it->second;
+    auto asfTree = hierarchyNode->getASFTree();
+    
+    if (!asfTree) return false;
+    
+    // Convert the symmetry type
+    bool success = asfTree->convertSymmetryType();
+    
+    // Mark the symmetry group node for repacking
+    markSubtreeForRepack(hierarchyNode);
+    
+    // Repack affected subtrees
+    if (success && isPacked) {
+        repackAffectedSubtrees();
+    }
+    
+    return success;
+}
+
+/**
  * Changes the representative of a symmetry pair in a symmetry group
+ * 
+ * @param symmetryGroupName Name of the symmetry group
+ * @param moduleName Name of the module in the symmetry pair
+ * @return True if the change was successful, false otherwise
  */
 bool HBStarTree::changeRepresentative(const string& symmetryGroupName, 
                                      const string& moduleName) {
@@ -940,36 +792,287 @@ bool HBStarTree::changeRepresentative(const string& symmetryGroupName,
     // Change the representative
     bool success = asfTree->changeRepresentative(moduleName);
     
-    // Since the symmetry island might have changed, the tree needs to be repacked
+    // Mark the symmetry group node for repacking
+    markSubtreeForRepack(hierarchyNode);
+    
+    // Repack affected subtrees
     if (success && isPacked) {
-        pack();
+        repackAffectedSubtrees();
     }
     
     return success;
 }
 
 /**
- * Converts the symmetry type of a symmetry group
+ * Mark a subtree for repacking after a modification
  */
-bool HBStarTree::convertSymmetryType(const string& symmetryGroupName) {
-    // Find the symmetry group
-    auto it = symmetryGroupNodes.find(symmetryGroupName);
-    if (it == symmetryGroupNodes.end()) return false;
+void HBStarTree::markSubtreeForRepack(shared_ptr<HBStarTreeNode> node) {
+    if (!node) return;
     
-    auto hierarchyNode = it->second;
-    auto asfTree = hierarchyNode->getASFTree();
+    // Add the node and all its ancestors to the modified set
+    auto current = node;
+    while (current) {
+        modifiedSubtrees.insert(current);
+        current = current->getParent();
+    }
+}
+
+/**
+ * Repack only the affected subtrees
+ */
+void HBStarTree::repackAffectedSubtrees() {
+    if (modifiedSubtrees.empty()) return;
     
-    if (!asfTree) return false;
+    // Find the highest modified nodes (nodes with no modified ancestors)
+    vector<shared_ptr<HBStarTreeNode>> rootsToRepack;
     
-    // Convert the symmetry type
-    bool success = asfTree->convertSymmetryType();
-    
-    // Since the symmetry island might have changed, the tree needs to be repacked
-    if (success && isPacked) {
-        pack();
+    for (const auto& node : modifiedSubtrees) {
+        bool isRoot = true;
+        auto parent = node->getParent();
+        
+        while (parent) {
+            if (modifiedSubtrees.find(parent) != modifiedSubtrees.end()) {
+                isRoot = false;
+                break;
+            }
+            parent = parent->getParent();
+        }
+        
+        if (isRoot) {
+            rootsToRepack.push_back(node);
+        }
     }
     
-    return success;
+    // Sort by tree depth to repack lowest nodes first
+    sort(rootsToRepack.begin(), rootsToRepack.end(), 
+        [](const shared_ptr<HBStarTreeNode>& a, const shared_ptr<HBStarTreeNode>& b) {
+            int depthA = 0, depthB = 0;
+            auto currA = a, currB = b;
+            
+            while (currA->getParent()) {
+                depthA++;
+                currA = currA->getParent();
+            }
+            
+            while (currB->getParent()) {
+                depthB++;
+                currB = currB->getParent();
+            }
+            
+            return depthA > depthB;
+        });
+    
+    // Repack each subtree
+    for (const auto& node : rootsToRepack) {
+        packSubtree(node);
+    }
+    
+    // Clear the modified set
+    modifiedSubtrees.clear();
+}
+
+/**
+ * Pack a subtree starting from the given node
+ */
+void HBStarTree::packSubtree(shared_ptr<HBStarTreeNode> node) {
+    if (!node) return;
+    
+    switch (node->getType()) {
+        case HBNodeType::MODULE: {
+            // Pack a regular module
+            const string& moduleName = node->getModuleName();
+            auto module = modules[moduleName];
+            
+            if (!module) return;
+            
+            int x = 0, y = 0;
+            
+            // Calculate x-coordinate based on B*-tree rules
+            if (node->getParent()) {
+                if (node->isLeftChild()) {
+                    // Left child: place to the right of parent
+                    if (node->getParent()->getType() == HBNodeType::MODULE) {
+                        auto parentModule = modules[node->getParent()->getModuleName()];
+                        if (parentModule) {
+                            x = parentModule->getX() + parentModule->getWidth();
+                        }
+                    } else if (node->getParent()->getType() == HBNodeType::HIERARCHY) {
+                        auto asfTree = node->getParent()->getASFTree();
+                        if (asfTree) {
+                            x = static_cast<int>(asfTree->getSymmetryAxisPosition());
+                        }
+                    } else if (node->getParent()->getType() == HBNodeType::CONTOUR) {
+                        int x1, y1, x2, y2;
+                        node->getParent()->getContour(x1, y1, x2, y2);
+                        x = x2;
+                    }
+                } else {
+                    // Right child: same x-coordinate as parent
+                    if (node->getParent()->getType() == HBNodeType::MODULE) {
+                        auto parentModule = modules[node->getParent()->getModuleName()];
+                        if (parentModule) {
+                            x = parentModule->getX();
+                        }
+                    } else if (node->getParent()->getType() == HBNodeType::HIERARCHY) {
+                        x = 0;
+                    } else if (node->getParent()->getType() == HBNodeType::CONTOUR) {
+                        int x1, y1, x2, y2;
+                        node->getParent()->getContour(x1, y1, x2, y2);
+                        x = x1;
+                    }
+                }
+            }
+            
+            // Calculate y-coordinate using the horizontal contour
+            y = horizontalContour->getHeight(x, x + module->getWidth());
+            
+            // Set the module's position
+            module->setPosition(x, y);
+            
+            // Update contours
+            horizontalContour->addSegment(x, x + module->getWidth(), y + module->getHeight());
+            verticalContour->addSegment(y, y + module->getHeight(), x + module->getWidth());
+            
+            break;
+        }
+        case HBNodeType::HIERARCHY: {
+            // Pack a symmetry island
+            auto asfTree = node->getASFTree();
+            if (!asfTree) return;
+            
+            // Pack the ASF-B*-tree
+            asfTree->pack();
+            
+            // Get the bounding rectangle of the symmetry island
+            int minX = std::numeric_limits<int>::max();
+            int minY = std::numeric_limits<int>::max();
+            int symMaxX = 0;
+            int symMaxY = 0;
+            
+            for (const auto& pair : asfTree->getModules()) {
+                const auto& module = pair.second;
+                
+                minX = min(minX, module->getX());
+                minY = min(minY, module->getY());
+                symMaxX = max(symMaxX, module->getX() + module->getWidth());
+                symMaxY = max(symMaxY, module->getY() + module->getHeight());
+            }
+            
+            // Calculate the position for the symmetry island
+            int x = 0, y = 0;
+            
+            // Calculate x-coordinate based on B*-tree rules
+            if (node->getParent()) {
+                if (node->isLeftChild()) {
+                    // Left child: place to the right of parent
+                    if (node->getParent()->getType() == HBNodeType::MODULE) {
+                        auto parentModule = modules[node->getParent()->getModuleName()];
+                        if (parentModule) {
+                            x = parentModule->getX() + parentModule->getWidth();
+                        }
+                    } else if (node->getParent()->getType() == HBNodeType::HIERARCHY) {
+                        auto parentAsfTree = node->getParent()->getASFTree();
+                        if (parentAsfTree) {
+                            x = static_cast<int>(parentAsfTree->getSymmetryAxisPosition());
+                        }
+                    } else if (node->getParent()->getType() == HBNodeType::CONTOUR) {
+                        int x1, y1, x2, y2;
+                        node->getParent()->getContour(x1, y1, x2, y2);
+                        x = x2;
+                    }
+                } else {
+                    // Right child: same x-coordinate as parent
+                    if (node->getParent()->getType() == HBNodeType::MODULE) {
+                        auto parentModule = modules[node->getParent()->getModuleName()];
+                        if (parentModule) {
+                            x = parentModule->getX();
+                        }
+                    } else if (node->getParent()->getType() == HBNodeType::HIERARCHY) {
+                        x = 0;
+                    } else if (node->getParent()->getType() == HBNodeType::CONTOUR) {
+                        int x1, y1, x2, y2;
+                        node->getParent()->getContour(x1, y1, x2, y2);
+                        x = x1;
+                    }
+                }
+            }
+            
+            // Calculate y-coordinate using the horizontal contour
+            y = horizontalContour->getHeight(x, x + (symMaxX - minX));
+            
+            // Shift all modules in the symmetry island
+            int deltaX = x - minX;
+            int deltaY = y - minY;
+            
+            for (const auto& pair : asfTree->getModules()) {
+                const auto& module = pair.second;
+                module->setPosition(module->getX() + deltaX, module->getY() + deltaY);
+            }
+            
+            // Update contours
+            horizontalContour->addSegment(x, x + (symMaxX - minX), y + (symMaxY - minY));
+            verticalContour->addSegment(y, y + (symMaxY - minY), x + (symMaxX - minX));
+            
+            break;
+        }
+        case HBNodeType::CONTOUR:
+            // Contour nodes don't need to be packed
+            break;
+    }
+    
+    // Recursively pack children
+    if (node->getLeftChild()) {
+        packSubtree(node->getLeftChild());
+    }
+    if (node->getRightChild()) {
+        packSubtree(node->getRightChild());
+    }
+}
+/**
+ * Register a node in the lookup maps
+ */
+void HBStarTree::registerNodeInMap(shared_ptr<HBStarTreeNode> node) {
+    if (!node) return;
+    
+    // Add to node map by name
+    nodeMap[node->getName()] = node;
+    
+    // Recursively register children
+    if (node->getLeftChild()) {
+        registerNodeInMap(node->getLeftChild());
+    }
+    if (node->getRightChild()) {
+        registerNodeInMap(node->getRightChild());
+    }
+}
+
+/**
+ * Unregister a node from the lookup maps
+ */
+void HBStarTree::unregisterNodeFromMap(shared_ptr<HBStarTreeNode> node) {
+    if (!node) return;
+    
+    // Remove from node map
+    nodeMap.erase(node->getName());
+    
+    // Recursively unregister children
+    if (node->getLeftChild()) {
+        unregisterNodeFromMap(node->getLeftChild());
+    }
+    if (node->getRightChild()) {
+        unregisterNodeFromMap(node->getRightChild());
+    }
+}
+
+/**
+ * Find a node by name
+ */
+shared_ptr<HBStarTreeNode> HBStarTree::findNode(const string& nodeName) const {
+    auto it = nodeMap.find(nodeName);
+    if (it != nodeMap.end()) {
+        return it->second;
+    }
+    return nullptr;
 }
 
 /**

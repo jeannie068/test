@@ -1,18 +1,11 @@
-/**
- * Contour.hpp
- * 
- * This file defines the Contour class used for efficient packing in the ASF-B*-tree
- * placement algorithm. The contour data structure represents the skyline profile
- * of the currently placed modules, allowing for O(log n) height queries and updates.
- */
-
 #pragma once
 
-#include <map>
 #include <vector>
 #include <utility>
+#include <algorithm>
 #include <limits>
 #include <memory>
+#include <functional>
 
 /**
  * Contour segment representing a horizontal or vertical segment in the placement
@@ -31,83 +24,62 @@ struct ContourSegment {
 };
 
 /**
- * Contour class representing the skyline profile of the placement
- * Supports efficient queries and updates in O(log n) time
+ * Optimized Contour class using sorted vector of segments
+ * with binary search for faster queries instead of map-based lookup
  */
 class Contour {
 private:
-    // Using a balanced tree (map) to store the contour segments for efficient operations
-    std::map<int, int> contourMap;  // Maps coordinate to height/value
+    // Using a sorted vector of segments for better cache locality
+    std::vector<ContourSegment> segments;
+    
+    // Maintain max coordinates and heights for quick access
+    int maxCoordinate;
+    int maxHeight;
+    
+    // Binary search to find segment containing a point
+    int findSegmentIndex(int coordinate) const;
+    
+    // Merge overlapping segments with same height
+    void mergeSegments();
     
 public:
-
     Contour();
-    
-    /**
-     * Copy constructor
-     */
     Contour(const Contour& other);
     ~Contour();
     void clear();
     
     /**
-     * Adds a segment to the contour
-     * 
-     * @param start Start coordinate of the segment
-     * @param end End coordinate of the segment
-     * @param height Height of the segment
+     * Adds a segment to the contour - O(log n) with binary search
      */
     void addSegment(int start, int end, int height);
     
     /**
-     * Gets the height of the contour at a specific range
-     * 
-     * @param start Start coordinate of the range
-     * @param end End coordinate of the range
-     * @return Maximum height in the range
+     * Gets the height of the contour at a specific range - O(log n)
      */
     int getHeight(int start, int end) const;
     
     /**
      * Gets all contour segments
-     * 
-     * @return Vector of contour segments
      */
-    std::vector<ContourSegment> getSegments() const;
+    const std::vector<ContourSegment>& getSegments() const;
     
     /**
      * Merges this contour with another contour
-     * 
-     * @param other Other contour to merge with
      */
     void merge(const Contour& other);
     
     /**
      * Gets the maximum coordinate value in the contour
-     * 
-     * @return Maximum coordinate value
      */
     int getMaxCoordinate() const;
     
     /**
      * Gets the maximum height value in the contour
-     * 
-     * @return Maximum height value
      */
     int getMaxHeight() const;
     
     /**
      * Checks if the contour is empty
-     * 
-     * @return True if the contour is empty, false otherwise
      */
     bool isEmpty() const;
-    
-    /**
-     * Gets the contour map for direct access
-     * (for advanced operations)
-     * 
-     * @return Reference to the internal contour map
-     */
-    const std::map<int, int>& getContourMap() const;
 };

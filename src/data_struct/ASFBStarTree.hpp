@@ -13,8 +13,11 @@
 #include <map>
 #include <string>
 #include <utility>
-using namespace std;
+#include <unordered_map>
+#include <set>
+#include <functional>
 
+using namespace std;
 
 class ASFBStarTree {
 private:
@@ -28,7 +31,11 @@ private:
     // Track representatives for symmetry pairs and self-symmetric modules
     map<string, string> representativeMap;  // Maps module to its representative
     map<string, string> symmetricPairMap;   // Maps a module to its symmetric pair
-    vector<string> selfSymmetricModules;         // List of self-symmetric modules
+    vector<string> selfSymmetricModules;    // List of self-symmetric modules
+    
+    // NEW: Efficient node lookup
+    unordered_map<string, shared_ptr<BStarTreeNode>> nodeMap;
+    std::set<shared_ptr<BStarTreeNode>, std::less<shared_ptr<BStarTreeNode>>> modifiedNodes;
     
     // Contour structure for packing
     shared_ptr<Contour> horizontalContour;
@@ -49,6 +56,12 @@ private:
     void updateContourWithModule(const shared_ptr<Module>& module);
     void packNode(const shared_ptr<BStarTreeNode>& node);
     void calculateSymmetricModulePositions();
+    
+    // NEW: Node lookup management
+    void registerNodeInMap(shared_ptr<BStarTreeNode> node);
+    void unregisterNodeFromMap(shared_ptr<BStarTreeNode> node);
+    void markNodeForRepack(shared_ptr<BStarTreeNode> node);
+    void repackModifiedNodes();
     
 public:
     /**
@@ -184,5 +197,13 @@ public:
      */
     string getRepresentative(const string& moduleName) const;
     
+    /**
+     * Creates a deep copy of this ASF-B*-tree
+     * 
+     * @return A new ASF-B*-tree that is a deep copy of this one
+     */
     shared_ptr<ASFBStarTree> clone() const;
+    
+    // NEW: Direct node lookup method
+    shared_ptr<BStarTreeNode> findNode(const string& nodeName) const;
 };

@@ -11,9 +11,9 @@ using namespace std;
 /**
  * Constructor
  */
-ASFBStarTree::ASFBStarTree(shared_ptr<SymmetryGroup> symmetryGroup)
-    : symmetryGroup(symmetryGroup), 
-      root(nullptr),
+ASFBStarTree::ASFBStarTree(shared_ptr<SymmetryGroup> symGroup)
+    : root(nullptr),
+      symmetryGroup(symGroup),
       horizontalContour(make_shared<Contour>()),
       verticalContour(make_shared<Contour>()),
       symmetryAxisPosition(0.0) {
@@ -41,6 +41,8 @@ ASFBStarTree::ASFBStarTree(shared_ptr<SymmetryGroup> symmetryGroup)
 }
 
 ASFBStarTree::~ASFBStarTree() {
+    // Clear node map
+    nodeMap.clear();
 }
 
 /**
@@ -57,8 +59,9 @@ void ASFBStarTree::addModule(shared_ptr<Module> module) {
  * Constructs an initial ASF-B*-tree based on the symmetry group
  */
 void ASFBStarTree::constructInitialTree() {
-    // Clear any existing tree
+    // Clear any existing tree and node map
     root = nullptr;
+    nodeMap.clear();
     
     // First, collect all representatives
     vector<string> representatives;
@@ -79,6 +82,9 @@ void ASFBStarTree::constructInitialTree() {
     
     // Create the root node with the first representative
     root = make_shared<BStarTreeNode>(representatives[0]);
+    
+    // Register the root node in the lookup map
+    registerNodeInMap(root);
     
     // Add other representatives to the tree
     for (size_t i = 1; i < representatives.size(); ++i) {
@@ -117,6 +123,9 @@ void ASFBStarTree::constructInitialTree() {
             current->setRightChild(newNode);
             newNode->setParent(current);
         }
+        
+        // Register the new node in the lookup map
+        registerNodeInMap(newNode);
     }
 }
 
@@ -251,12 +260,14 @@ void ASFBStarTree::calculateSymmetricModulePositions() {
 bool ASFBStarTree::pack() {
     if (!root) return false;
     
+    // If there are modified nodes, only repack those
+    if (!modifiedNodes.empty()) {
+        repackModifiedNodes();
+        return true;
+    }
+    
     // Initialize contours
     initializeContours();
-    
-    // Set the symmetry axis position based on the tree structure
-    // For simplicity, we'll place it at the rightmost position of the modules
-    int maxX = 0, maxY = 0;
     
     // Traverse the tree in pre-order and pack each node
     queue<shared_ptr<BStarTreeNode>> nodeQueue;
@@ -271,13 +282,6 @@ bool ASFBStarTree::pack() {
         // Pack the current node
         packNode(currentNode);
         
-        // Update maximum coordinates
-        auto module = modules[currentNode->getModuleName()];
-        if (module) {
-            maxX = max(maxX, module->getX() + module->getWidth());
-            maxY = max(maxY, module->getY() + module->getHeight());
-        }
-        
         // Add children to the queue
         if (currentNode->getLeftChild()) {
             nodeQueue.push(currentNode->getLeftChild());
@@ -289,8 +293,20 @@ bool ASFBStarTree::pack() {
     
     // Set the symmetry axis position
     if (symmetryGroup->getType() == SymmetryType::VERTICAL) {
+        int maxX = 0;
+        for (const auto& pair : modules) {
+            if (isRepresentative(pair.first)) {
+                maxX = max(maxX, pair.second->getX() + pair.second->getWidth());
+            }
+        }
         symmetryAxisPosition = maxX;  // Place the symmetry axis at the rightmost point
     } else {
+        int maxY = 0;
+        for (const auto& pair : modules) {
+            if (isRepresentative(pair.first)) {
+                maxY = max(maxY, pair.second->getY() + pair.second->getHeight());
+            }
+        }
         symmetryAxisPosition = maxY;  // Place the symmetry axis at the topmost point
     }
     
@@ -470,30 +486,16 @@ bool ASFBStarTree::canMoveNode(const shared_ptr<BStarTreeNode>& node,
 bool ASFBStarTree::moveNode(const string& nodeName, 
                            const string& newParentName, 
                            bool asLeftChild) {
-    // Find the nodes
-    shared_ptr<BStarTreeNode> node = nullptr;
-    shared_ptr<BStarTreeNode> newParent = nullptr;
-    
-    // Find the node to move
-    queue<shared_ptr<BStarTreeNode>> queue;
-    if (root) queue.push(root);
-    
-    while (!queue.empty() && (!node || !newParent)) {
-        auto current = queue.front();
-        queue.pop();
-        
-        if (current->getModuleName() == nodeName) {
-            node = current;
-        }
-        if (current->getModuleName() == newParentName) {
-            newParent = current;
-        }
-        
-        if (current->getLeftChild()) queue.push(current->getLeftChild());
-        if (current->getRightChild()) queue.push(current->getRightChild());
-    }
+    // Use direct lookup instead of traversing the tree
+    auto node = findNode(nodeName);
+    auto newParent = findNode(newParentName);
     
     if (!node || !newParent) return false;
+    
+    // Check if the move is valid
+    if (!canMoveNode(node, newParent, asLeftChild)) {
+        return false;
+    }
     
     // Check if the move is valid
     if (!canMoveNode(node, newParent, asLeftChild)) {
@@ -534,6 +536,15 @@ bool ASFBStarTree::moveNode(const string& nodeName,
         newParent->setRightChild(node);
     }
     
+    markNodeForRepack(node);
+    markNodeForRepack(newParent);
+    if (node->getParent()) {
+        markNodeForRepack(node->getParent());
+    }
+    
+    // Pack the modified nodes
+    repackModifiedNodes();
+    
     return true;
 }
 
@@ -541,28 +552,9 @@ bool ASFBStarTree::moveNode(const string& nodeName,
  * Swaps two nodes in the tree
  */
 bool ASFBStarTree::swapNodes(const string& nodeName1, const string& nodeName2) {
-    // Find the nodes
-    shared_ptr<BStarTreeNode> node1 = nullptr;
-    shared_ptr<BStarTreeNode> node2 = nullptr;
-    
-    // Find the nodes to swap
-    queue<shared_ptr<BStarTreeNode>> queue;
-    if (root) queue.push(root);
-    
-    while (!queue.empty() && (!node1 || !node2)) {
-        auto current = queue.front();
-        queue.pop();
-        
-        if (current->getModuleName() == nodeName1) {
-            node1 = current;
-        }
-        if (current->getModuleName() == nodeName2) {
-            node2 = current;
-        }
-        
-        if (current->getLeftChild()) queue.push(current->getLeftChild());
-        if (current->getRightChild()) queue.push(current->getRightChild());
-    }
+    // Use direct lookup instead of traversing the tree
+    auto node1 = findNode(nodeName1);
+    auto node2 = findNode(nodeName2);
     
     if (!node1 || !node2) return false;
     
@@ -640,6 +632,19 @@ bool ASFBStarTree::swapNodes(const string& nodeName1, const string& nodeName2) {
     if (leftChild1) leftChild1->setParent(node2);
     if (rightChild1) rightChild1->setParent(node2);
     
+    // Mark affected nodes for repacking
+    markNodeForRepack(node1);
+    markNodeForRepack(node2);
+    if (node1->getParent()) {
+        markNodeForRepack(node1->getParent());
+    }
+    if (node2->getParent()) {
+        markNodeForRepack(node2->getParent());
+    }
+    
+    // Pack the modified nodes
+    repackModifiedNodes();
+    
     return true;
 }
 
@@ -695,6 +700,111 @@ bool ASFBStarTree::convertSymmetryType() {
     return true;
 }
 
+// Direct node lookup by name
+shared_ptr<BStarTreeNode> ASFBStarTree::findNode(const string& nodeName) const {
+    auto it = nodeMap.find(nodeName);
+    if (it != nodeMap.end()) {
+        return it->second;
+    }
+    
+    // If not found in the map, traverse the tree
+    // This should rarely happen after initialization
+    std::queue<shared_ptr<BStarTreeNode>> queue;
+    if (root) queue.push(root);
+    
+    while (!queue.empty()) {
+        auto current = queue.front();
+        queue.pop();
+        
+        if (current->getModuleName() == nodeName) {
+            return current;
+        }
+        
+        if (current->getLeftChild()) queue.push(current->getLeftChild());
+        if (current->getRightChild()) queue.push(current->getRightChild());
+    }
+    
+    return nullptr;
+}
+
+// Register a node and its children in the lookup map
+void ASFBStarTree::registerNodeInMap(shared_ptr<BStarTreeNode> node) {
+    if (!node) return;
+    
+    // Add to node map
+    nodeMap[node->getModuleName()] = node;
+    
+    // Recursively register children
+    if (node->getLeftChild()) {
+        registerNodeInMap(node->getLeftChild());
+    }
+    if (node->getRightChild()) {
+        registerNodeInMap(node->getRightChild());
+    }
+}
+
+// Unregister a node and its children from the lookup map
+void ASFBStarTree::unregisterNodeFromMap(shared_ptr<BStarTreeNode> node) {
+    if (!node) return;
+    
+    // Remove from node map
+    nodeMap.erase(node->getModuleName());
+    
+    // Recursively unregister children
+    if (node->getLeftChild()) {
+        unregisterNodeFromMap(node->getLeftChild());
+    }
+    if (node->getRightChild()) {
+        unregisterNodeFromMap(node->getRightChild());
+    }
+}
+
+// Mark a node for repacking
+void ASFBStarTree::markNodeForRepack(shared_ptr<BStarTreeNode> node) {
+    if (!node) return;
+    
+    modifiedNodes.insert(node);
+}
+
+// Repack only the modified nodes and their subtrees
+void ASFBStarTree::repackModifiedNodes() {
+    if (modifiedNodes.empty()) return;
+    
+    // Initialize contours
+    initializeContours();
+    
+    // Sort modified nodes by depth (deepest first)
+    std::vector<shared_ptr<BStarTreeNode>> sortedNodes(modifiedNodes.begin(), modifiedNodes.end());
+    std::sort(sortedNodes.begin(), sortedNodes.end(), 
+             [](const shared_ptr<BStarTreeNode>& a, const shared_ptr<BStarTreeNode>& b) {
+                 int depthA = 0, depthB = 0;
+                 auto currA = a, currB = b;
+                 
+                 while (currA->getParent()) {
+                     depthA++;
+                     currA = currA->getParent();
+                 }
+                 
+                 while (currB->getParent()) {
+                     depthB++;
+                     currB = currB->getParent();
+                 }
+                 
+                 return depthA > depthB;
+             });
+    
+    // Pack each modified node
+    for (const auto& node : sortedNodes) {
+        packNode(node);
+    }
+    
+    // Calculate positions for symmetric modules
+    calculateSymmetricModulePositions();
+    
+    // Clear modified nodes
+    modifiedNodes.clear();
+}
+
 shared_ptr<BStarTreeNode> ASFBStarTree::getRoot() const {
     return root;
 }
@@ -736,7 +846,7 @@ bool ASFBStarTree::isRepresentative(const string& moduleName) const {
  * Creates a deep copy of this ASF-B*-tree
  */
 shared_ptr<ASFBStarTree> ASFBStarTree::clone() const {
-    auto clone = make_shared<ASFBStarTree>(symmetryGroup);
+    auto clone = std::make_shared<ASFBStarTree>(symmetryGroup);
     
     // Copy modules
     for (const auto& pair : modules) {
@@ -776,6 +886,9 @@ shared_ptr<ASFBStarTree> ASFBStarTree::clone() const {
         };
         
         clone->root = cloneNode(root);
+        
+        // Build the node lookup map for the clone
+        clone->registerNodeInMap(clone->root);
     }
     
     // Clone contours

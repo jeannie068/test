@@ -16,6 +16,7 @@
 #include <string>
 #include <utility>
 #include <set>
+#include <unordered_map> // Added for efficient node lookup
 
 #include "HBStarTreeNode.hpp"
 #include "ASFBStarTree.hpp"
@@ -26,7 +27,6 @@ using namespace std;
 
 class HBStarTree {
 private:
-
     shared_ptr<HBStarTreeNode> root;
     
     map<string, shared_ptr<Module>> modules; // All modules
@@ -37,6 +37,12 @@ private:
     
     // Map from module name to its node in the tree
     map<string, shared_ptr<HBStarTreeNode>> moduleNodes;
+    
+    // NEW: Direct node lookup maps for faster operations
+    unordered_map<string, shared_ptr<HBStarTreeNode>> nodeMap; // Any node by name
+    
+    // NEW: Track modified subtrees for partial repacking
+    std::set<shared_ptr<HBStarTreeNode>> modifiedSubtrees;
     
     // Contour for efficient packing
     shared_ptr<Contour> horizontalContour;
@@ -58,20 +64,27 @@ private:
     void constructInitialTreeStructure();
     void clearTree();
     
+    // NEW: Partial repacking methods
+    void markSubtreeForRepack(shared_ptr<HBStarTreeNode> node);
+    void repackAffectedSubtrees();
+    void packSubtree(shared_ptr<HBStarTreeNode> node);
+    
+    // NEW: Helper to register nodes in lookup maps
+    void registerNodeInMap(shared_ptr<HBStarTreeNode> node);
+    void unregisterNodeFromMap(shared_ptr<HBStarTreeNode> node);
+    
 public:
-    /**
-     * Constructor
-     */
+    // Constructor
     HBStarTree();
     ~HBStarTree();
     
-    /* Adds a module to the treec */
+    // Adds a module to the tree
     void addModule(shared_ptr<Module> module);
     
-    /* Adds a symmetry group to the tree */
+    // Adds a symmetry group to the tree
     void addSymmetryGroup(shared_ptr<SymmetryGroup> group);
     
-    /* Constructs an initial HB*-tree */
+    // Constructs an initial HB*-tree
     void constructInitialTree();
     
     /**
@@ -180,4 +193,7 @@ public:
      * @return A new HB*-tree that is a deep copy of this one
      */
     shared_ptr<HBStarTree> clone() const;
+    
+    // NEW: Direct node lookup method
+    shared_ptr<HBStarTreeNode> findNode(const string& nodeName) const;
 };
