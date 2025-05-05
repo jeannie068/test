@@ -94,6 +94,10 @@ int main(int argc, char* argv[]) {
     // Set a custom emergency callback that writes the output before exiting
     timeoutManager->setEmergencyCallback([&]() {
         cout << "\nEmergency shutdown activated. Writing best solution found so far." << endl;
+        
+        // Make sure we calculate the area of the solution
+        solver.finalizeSolution();
+        
         int solutionArea = solver.getSolutionArea();
         auto solutionModules = solver.getSolutionModules();
         
@@ -118,6 +122,9 @@ int main(int argc, char* argv[]) {
         
         // If we've reached here without timeout, write the output
         if (success || timeoutManager->hasTimedOut()) {
+            // Make sure we calculate the area of the solution
+            solver.finalizeSolution();
+            
             int solutionArea = solver.getSolutionArea();
             auto solutionModules = solver.getSolutionModules();
             
@@ -150,6 +157,9 @@ int main(int argc, char* argv[]) {
         string errorMsg = e.what();
         if (errorMsg.find("Timeout") != string::npos) {
             cout << "Caught timeout exception: " << errorMsg << endl;
+            
+            // Make sure we calculate the area of the solution
+            solver.finalizeSolution();
             
             // Try to write the output with the best solution so far
             int solutionArea = solver.getSolutionArea();

@@ -253,3 +253,66 @@ map<string, int> PlacementSolver::getStatistics() const {
     stats["totalArea"] = totalArea;
     return stats;
 }
+
+/**
+ * Finalizes the solution - ensures the HB*-tree is packed and area is calculated
+ * This is crucial to call before getting solution area, especially after timeout
+ */
+void PlacementSolver::finalizeSolution() {
+    // Make sure we have a valid HB*-tree
+    if (!hbTree || !hbTree->getRoot()) {
+        std::cerr << "Error: No solution to finalize" << std::endl;
+        totalArea = 0;
+        return;
+    }
+    
+    try {
+        // Ensure the tree is packed to get latest coordinates
+        hbTree->pack();
+        
+        // Calculate the area
+        totalArea = hbTree->getArea();
+        
+        // Debug output
+        std::cout << "Solution finalized - Area: " << totalArea << std::endl;
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Error finalizing solution: " << e.what() << std::endl;
+        
+        // Try a more cautious approach to get some valid area
+        // This is a fallback mechanism for when we have a solution but packing fails
+        int minX = std::numeric_limits<int>::max();
+        int minY = std::numeric_limits<int>::max();
+        int maxX = 0;
+        int maxY = 0;
+        
+        bool validCoordinates = false;
+        
+        // Calculate bounding box from module positions
+        for (const auto& pair : modules) {
+            const auto& module = pair.second;
+            if (module) {
+                int x = module->getX();
+                int y = module->getY();
+                int width = module->getWidth();
+                int height = module->getHeight();
+                
+                if (x >= 0 && y >= 0) {  // Only consider valid coordinates
+                    minX = std::min(minX, x);
+                    minY = std::min(minY, y);
+                    maxX = std::max(maxX, x + width);
+                    maxY = std::max(maxY, y + height);
+                    validCoordinates = true;
+                }
+            }
+        }
+        
+        if (validCoordinates) {
+            totalArea = (maxX - minX) * (maxY - minY);
+            std::cout << "Estimated area from module positions: " << totalArea << std::endl;
+        } else {
+            // If all else fails, return the last known area
+            std::cout << "Using last known area: " << totalArea << std::endl;
+        }
+    }
+}

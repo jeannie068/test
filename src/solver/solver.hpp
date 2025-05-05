@@ -123,6 +123,12 @@ public:
     bool solve();
     
     /**
+     * Finalizes the solution - ensures the HB*-tree is packed and area is calculated
+     * This is crucial to call before getting solution area, especially after timeout
+     */
+    void finalizeSolution();
+    
+    /**
      * Gets the solution area
      * 
      * @return Total area of the placement

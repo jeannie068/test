@@ -15,7 +15,7 @@ private:
     std::chrono::steady_clock::time_point startTime;
     int timeoutSeconds;
     
-    // New: Emergency timer and callback
+    // Emergency timer and callback
     std::thread emergencyThread;
     int emergencyTimeoutSeconds;
     std::function<void()> emergencyCallback;
