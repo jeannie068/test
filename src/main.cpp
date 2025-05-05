@@ -46,100 +46,123 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    // Enforce the 5 minute limit
-    auto timeoutManager = make_shared<TimeoutManager>(290); // 4 mins 50 secs
-    timeoutManager->startWatchdog();
+    // Record start time
+    auto startTime = chrono::steady_clock::now();
     
-    try {
-        // Record start time
-        auto startTime = chrono::steady_clock::now();
-        
-        // Parse input file
-        map<string, shared_ptr<Module>> modules;
-        vector<shared_ptr<SymmetryGroup>> symmetryGroups;
-        
-        cout << "Parsing input file: " << inputFile << endl;
-        if (!Parser::parseInputFile(inputFile, modules, symmetryGroups)) {
-            cerr << "Error parsing input file" << endl;
-            return 1;
-        }
-        
-        // Configure and run placement solver
-        PlacementSolver solver;
-        
-        // Load problem data
-        solver.loadProblem(modules, symmetryGroups);
-        
-        // Configure simulated annealing parameters
-        solver.setAnnealingParameters(
-            1000.0,     // Initial temperature
-            0.1,        // Final temperature
-            0.95,       // Cooling rate
-            100,        // Iterations per temperature
-            1000        // No improvement limit
-        );
-        
-        // Configure perturbation probabilities
-        solver.setPerturbationProbabilities(
-            0.3,        // Rotate probability
-            0.3,        // Move probability
-            0.3,        // Swap probability
-            0.05,       // Change representative probability
-            0.05        // Convert symmetry type probability
-        );
-        
-        // Set cost function weights
-        solver.setCostWeights(
-            areaRatio,      // Area weight
-            1.0 - areaRatio // Wirelength weight (complementary to area weight)
-        );
-        
-        // Set random seed for reproducibility (optional)
-        solver.setRandomSeed(static_cast<unsigned int>(time(nullptr)));
-        
-        // Set the timeout manager
-        solver.setTimeoutManager(timeoutManager);
-        
-        // Solve the placement problem
-        cout << "Solving placement problem..." << endl;
-        
-        bool solveSuccess = false;
-        try {
-            solveSuccess = solver.solve();
-        }
-        catch (const exception& e) {
-            cout << "Exception during solving: " << e.what() << endl;
-            // Continue to write the best solution we have so far
-        }
-        
-        if (!solveSuccess && !timeoutManager->hasTimedOut()) {
-            cerr << "Error solving placement problem" << endl;
-            return 1;
-        }
-        
-        // Get the final solution
+    // Parse input file first to get module data
+    map<string, shared_ptr<Module>> modules;
+    vector<shared_ptr<SymmetryGroup>> symmetryGroups;
+    
+    cout << "Parsing input file: " << inputFile << endl;
+    if (!Parser::parseInputFile(inputFile, modules, symmetryGroups)) {
+        cerr << "Error parsing input file" << endl;
+        return 1;
+    }
+    
+    // Create solver with parsed data
+    PlacementSolver solver;
+    solver.loadProblem(modules, symmetryGroups);
+    
+    // Configure solver parameters
+    solver.setAnnealingParameters(
+        1000.0,     // Initial temperature
+        0.1,        // Final temperature
+        0.95,       // Cooling rate
+        100,        // Iterations per temperature
+        1000        // No improvement limit
+    );
+    
+    solver.setPerturbationProbabilities(
+        0.3,        // Rotate probability
+        0.3,        // Move probability
+        0.3,        // Swap probability
+        0.05,       // Change representative probability
+        0.05        // Convert symmetry type probability
+    );
+    
+    solver.setCostWeights(
+        areaRatio,      // Area weight
+        1.0 - areaRatio // Wirelength weight (complementary to area weight)
+    );
+    
+    solver.setRandomSeed(static_cast<unsigned int>(time(nullptr)));
+    
+    // Create the timeout manager with emergency shutdown after 10 seconds
+    // Main timeout is set to 290 seconds (4m 50s)
+    auto timeoutManager = make_shared<TimeoutManager>(290, 10);
+    
+    // Set a custom emergency callback that writes the output before exiting
+    timeoutManager->setEmergencyCallback([&]() {
+        cout << "\nEmergency shutdown activated. Writing best solution found so far." << endl;
         int solutionArea = solver.getSolutionArea();
         auto solutionModules = solver.getSolutionModules();
         
-        // If timeout occurred but we have some partial solution, still write the output
-        if (timeoutManager->hasTimedOut()) {
-            cout << "Writing the best solution found before timeout..." << endl;
-        }
-        
         // Write output file
-        cout << "Writing output file: " << outputFile << endl;
+        cout << "Writing emergency output file: " << outputFile << endl;
         if (!Parser::writeOutputFile(outputFile, solutionModules, solutionArea)) {
-            cerr << "Error writing output file" << endl;
+            cerr << "Error writing output file during emergency shutdown" << endl;
+        }
+        exit(0); // Clean exit
+    });
+    
+    // Start the watchdog
+    timeoutManager->startWatchdog();
+    
+    // Pass the timeout manager to the solver
+    solver.setTimeoutManager(timeoutManager);
+    
+    try {
+        // Solve the placement problem
+        cout << "Solving placement problem..." << endl;
+        bool success = solver.solve();
+        
+        // If we've reached here without timeout, write the output
+        if (success || timeoutManager->hasTimedOut()) {
+            int solutionArea = solver.getSolutionArea();
+            auto solutionModules = solver.getSolutionModules();
+            
+            if (timeoutManager->hasTimedOut()) {
+                cout << "Writing best solution found before timeout..." << endl;
+            } else {
+                cout << "Writing final solution..." << endl;
+            }
+            
+            // Write output file
+            cout << "Writing output file: " << outputFile << endl;
+            if (!Parser::writeOutputFile(outputFile, solutionModules, solutionArea)) {
+                cerr << "Error writing output file" << endl;
+                return 1;
+            }
+            
+            // Display execution time
+            auto endTime = chrono::steady_clock::now();
+            auto executionTime = chrono::duration_cast<chrono::seconds>(endTime - startTime).count();
+            cout << "Execution time: " << executionTime << " seconds" << endl;
+            cout << "Final area: " << solutionArea << endl;
+            
+            return 0;
+        } else {
+            cerr << "Error solving placement problem" << endl;
             return 1;
         }
-        
-        // Display execution time
-        auto endTime = chrono::steady_clock::now();
-        auto executionTime = chrono::duration_cast<chrono::seconds>(endTime - startTime).count();
-        cout << "Execution time: " << executionTime << " seconds" << endl;
-        cout << "Final area: " << solutionArea << endl;
-        
-        return 0;
+    }
+    catch (const runtime_error& e) {
+        string errorMsg = e.what();
+        if (errorMsg.find("Timeout") != string::npos) {
+            cout << "Caught timeout exception: " << errorMsg << endl;
+            
+            // Try to write the output with the best solution so far
+            int solutionArea = solver.getSolutionArea();
+            auto solutionModules = solver.getSolutionModules();
+            
+            cout << "Writing output file after timeout exception: " << outputFile << endl;
+            Parser::writeOutputFile(outputFile, solutionModules, solutionArea);
+            
+            return 0;
+        } else {
+            cerr << "Unexpected runtime error: " << errorMsg << endl;
+            return 1;
+        }
     }
     catch (const exception& e) {
         cerr << "Unexpected exception: " << e.what() << endl;

@@ -1,4 +1,4 @@
-// TimeoutManage.hpp
+// TimeoutManager.hpp
 #pragma once
 
 #include <atomic>
@@ -6,6 +6,7 @@
 #include <chrono>
 #include <iostream>
 #include <csignal>
+#include <functional>
 
 class TimeoutManager {
 private:
@@ -13,17 +14,32 @@ private:
     std::thread watchdogThread;
     std::chrono::steady_clock::time_point startTime;
     int timeoutSeconds;
+    
+    // New: Emergency timer and callback
+    std::thread emergencyThread;
+    int emergencyTimeoutSeconds;
+    std::function<void()> emergencyCallback;
 
 public:
-    TimeoutManager(int seconds = 300) : 
+    TimeoutManager(int seconds = 300, int emergencySeconds = 10) : 
         timeoutOccurred(false),
         startTime(std::chrono::steady_clock::now()),
-        timeoutSeconds(seconds) {
+        timeoutSeconds(seconds),
+        emergencyTimeoutSeconds(emergencySeconds) {
+        
+        // Set default emergency callback to forcefully exit
+        emergencyCallback = []() {
+            std::cerr << "\nEmergency shutdown activated. Forcing exit.\n";
+            std::exit(1); // Hard exit
+        };
     }
 
     ~TimeoutManager() {
         if (watchdogThread.joinable()) {
             watchdogThread.join();
+        }
+        if (emergencyThread.joinable()) {
+            emergencyThread.join();
         }
     }
 
@@ -39,6 +55,16 @@ public:
                 if (elapsedTime >= timeoutSeconds) {
                     timeoutOccurred = true;
                     std::cout << "\nProgram timeout reached! Forcing termination...\n" << std::endl;
+                    
+                    // Start emergency shutdown timer
+                    // If program doesn't exit gracefully, force it to exit
+                    emergencyThread = std::thread([this]() {
+                        std::this_thread::sleep_for(std::chrono::seconds(emergencyTimeoutSeconds));
+                        if (emergencyCallback) {
+                            emergencyCallback();
+                        }
+                    });
+                    emergencyThread.detach(); // Let it run independently
                     break;
                 }
                 
@@ -56,5 +82,10 @@ public:
         if (timeoutOccurred) {
             throw std::runtime_error("Timeout occurred");
         }
+    }
+    
+    // Set a custom emergency callback
+    void setEmergencyCallback(std::function<void()> callback) {
+        emergencyCallback = callback;
     }
 };

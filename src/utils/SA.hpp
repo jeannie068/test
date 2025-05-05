@@ -56,6 +56,7 @@ private:
     chrono::steady_clock::time_point startTime;
     chrono::seconds timeoutSeconds;
     std::shared_ptr<TimeoutManager> timeoutManager;
+    bool checkTimeout() const;
     
     /**
      * Calculates the cost of a solution
@@ -178,5 +179,4 @@ public:
     void setSeed(unsigned int seed);
 
     void setTimeoutManager(std::shared_ptr<TimeoutManager> manager);
-    bool checkTimeout() const;
 };

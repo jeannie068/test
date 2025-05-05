@@ -30,7 +30,7 @@ PlacementSolver::~PlacementSolver() {
 
 }
 
-void PlacementSolver::setTimeoutManager(shared_ptr<TimeoutManager> manager) {
+void PlacementSolver::setTimeoutManager(std::shared_ptr<TimeoutManager> manager) {
     timeoutManager = manager;
 }
 
@@ -145,28 +145,23 @@ bool PlacementSolver::solve() {
     }
     
     if (!hbTree || !hbTree->getRoot()) {
-        cerr << "Error: Failed to create initial solution." << endl;
+        std::cerr << "Error: Failed to create initial solution." << std::endl;
         return false;
     }
     
-    cout << "Starting simulated annealing..." << endl;
-    cout << "Initial temperature: " << initialTemperature << endl;
-    cout << "Final temperature: " << finalTemperature << endl;
-    cout << "Cooling rate: " << coolingRate << endl;
-    cout << "Iterations per temperature: " << iterationsPerTemperature << endl;
-    cout << "No improvement limit: " << noImprovementLimit << endl;
+    std::cout << "Starting simulated annealing..." << std::endl;
+    std::cout << "Initial temperature: " << initialTemperature << std::endl;
+    std::cout << "Final temperature: " << finalTemperature << std::endl;
+    std::cout << "Cooling rate: " << coolingRate << std::endl;
+    std::cout << "Iterations per temperature: " << iterationsPerTemperature << std::endl;
+    std::cout << "No improvement limit: " << noImprovementLimit << std::endl;
     
     // Create the simulated annealing solver
     SimulatedAnnealing sa(hbTree, initialTemperature, finalTemperature, coolingRate,
                          iterationsPerTemperature, noImprovementLimit);
     
-    // Set perturbation probabilities
     sa.setPerturbationProbabilities(probRotate, probMove, probSwap, probChangeRep, probConvertSym);
-    
-    // Set cost weights
     sa.setCostWeights(areaWeight, wirelengthWeight);
-    
-    // Set random seed
     sa.setSeed(randomSeed);
     
     // Pass the timeout manager
@@ -174,37 +169,64 @@ bool PlacementSolver::solve() {
         sa.setTimeoutManager(timeoutManager);
     }
     
-    // Regularly check for timeout during solving
+    // Check for timeout before starting
     if (timeoutManager && timeoutManager->hasTimedOut()) {
-        cout << "Timeout detected before starting SA." << endl;
+        std::cout << "Timeout detected before starting SA." << std::endl;
         return false;
     }
     
     // Run simulated annealing
-    auto result = sa.run();
-    if (!result) {
-        cerr << "Error: Simulated annealing failed to find a solution." << endl;
-        return false;
+    std::shared_ptr<HBStarTree> result = nullptr;
+    try {
+        result = sa.run();
+        if (!result) {
+            std::cerr << "Error: Simulated annealing failed to find a solution." << std::endl;
+            return false;
+        }
+    }
+    catch (const std::runtime_error& e) {
+        std::string errorMsg = e.what();
+        if (errorMsg.find("Timeout") != std::string::npos) {
+            std::cout << "SA process was interrupted by timeout." << std::endl;
+            // Use the best solution found so far
+            result = sa.getBestSolution();
+            if (!result) {
+                std::cerr << "No solution available after timeout." << std::endl;
+                return false;
+            }
+        } else {
+            throw; // Re-throw other runtime errors
+        }
     }
     
     // Update the HB*-tree with the best solution
     hbTree = result;
     
     // Ensure the solution is packed (should already be, but just to be safe)
-    hbTree->pack();
+    try {
+        hbTree->pack();
+    }
+    catch (const std::runtime_error& e) {
+        std::string errorMsg = e.what();
+        if (errorMsg.find("Timeout") != std::string::npos) {
+            std::cout << "Packing was interrupted by timeout. Using partial results." << std::endl;
+        } else {
+            throw; // Re-throw other runtime errors
+        }
+    }
     
     // Update statistics
     totalArea = hbTree->getArea();
     
-    cout << "Simulated annealing completed." << endl;
-    cout << "Final area: " << totalArea << endl;
+    std::cout << "Simulated annealing completed." << std::endl;
+    std::cout << "Final area: " << totalArea << std::endl;
     
     // Print statistics
     auto stats = sa.getStatistics();
-    cout << "Total iterations: " << stats["totalIterations"] << endl;
-    cout << "Accepted moves: " << stats["acceptedMoves"] << endl;
-    cout << "Rejected moves: " << stats["rejectedMoves"] << endl;
-    cout << "No improvement count: " << stats["noImprovementCount"] << endl;
+    std::cout << "Total iterations: " << stats["totalIterations"] << std::endl;
+    std::cout << "Accepted moves: " << stats["acceptedMoves"] << std::endl;
+    std::cout << "Rejected moves: " << stats["rejectedMoves"] << std::endl;
+    std::cout << "No improvement count: " << stats["noImprovementCount"] << std::endl;
     
     return true;
 }

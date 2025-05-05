@@ -12,7 +12,10 @@ void SimulatedAnnealing::setTimeoutManager(shared_ptr<TimeoutManager> manager) {
 }
 
 bool SimulatedAnnealing::checkTimeout() const {
-    return timeoutManager && timeoutManager->hasTimedOut();
+    if (timeoutManager && timeoutManager->hasTimedOut()) {
+        return true;
+    }
+    return false;
 }
 
 /**
@@ -110,6 +113,10 @@ int SimulatedAnnealing::calculateCost(const shared_ptr<HBStarTree>& solution) co
  * Performs a random perturbation on the current solution
  */
 bool SimulatedAnnealing::perturb() {
+    // Check for timeout
+    if (checkTimeout()) {
+        throw runtime_error("Timeout during perturbation");
+    }
     // Choose perturbation type based on probabilities
     double randVal = uniformDist(rng);
     
@@ -289,63 +296,77 @@ shared_ptr<HBStarTree> SimulatedAnnealing::run() {
         
         // Main annealing loop
         while (temperature > finalTemperature && noImprovementCount < noImprovementLimit) {
-            // Check for timeout
+            // Check for timeout at the beginning of each temperature
             if (checkTimeout()) {
-                cout << "Timeout detected in SA algorithm. Returning best solution so far." << endl;
-                break;
+                cout << "Timeout detected at temperature " << temperature 
+                          << ". Returning best solution so far." << endl;
+                return bestSolution;
             }
             
             // Perform iterations at current temperature
             for (int i = 0; i < iterationsPerTemperature; ++i) {
-                // Check for timeout periodically
+                // Check for timeout frequently during iterations
                 if (i % 10 == 0 && checkTimeout()) {
-                    cout << "Timeout detected during iteration. Breaking loop." << endl;
-                    break;
+                    cout << "Timeout detected during iteration " << i 
+                              << " at temperature " << temperature << "." << endl;
+                    return bestSolution;
                 }
                 
-                // Create a copy of the current solution
-                auto tempSolution = currentSolution->clone();
-                
-                // Perturb the temporary solution
-                bool perturbSuccess = perturb();
-                if (!perturbSuccess) {
-                    continue;  // Skip this iteration if perturbation failed
-                }
-                
-                // Pack the solution to get updated coordinates and area
-                currentSolution->pack();
-                
-                // Calculate new cost
-                int newCost = calculateCost(currentSolution);
-                
-                // Decide whether to accept the move
-                int costDifference = newCost - currentCost;
-                if (acceptMove(costDifference, temperature)) {
-                    // Accept the move
-                    currentCost = newCost;
-                    acceptedMoves++;
+                try {
+                    // Create a copy of the current solution
+                    auto tempSolution = currentSolution->clone();
                     
-                    // Update best solution if improved
-                    if (newCost < bestCost) {
-                        bestSolution = currentSolution->clone();
-                        bestCost = newCost;
-                        noImprovementCount = 0;
+                    // Perturb the temporary solution
+                    bool perturbSuccess = perturb();
+                    if (!perturbSuccess) {
+                        continue;  // Skip this iteration if perturbation failed
+                    }
+                    
+                    // Pack the solution to get updated coordinates and area
+                    currentSolution->pack();
+                    
+                    // Calculate new cost
+                    int newCost = calculateCost(currentSolution);
+                    
+                    // Decide whether to accept the move
+                    int costDifference = newCost - currentCost;
+                    if (acceptMove(costDifference, temperature)) {
+                        // Accept the move
+                        currentCost = newCost;
+                        acceptedMoves++;
+                        
+                        // Update best solution if improved
+                        if (newCost < bestCost) {
+                            bestSolution = currentSolution->clone();
+                            bestCost = newCost;
+                            noImprovementCount = 0;
+                        } else {
+                            noImprovementCount++;
+                        }
                     } else {
+                        // Reject the move
+                        currentSolution = tempSolution;
+                        rejectedMoves++;
                         noImprovementCount++;
                     }
-                } else {
-                    // Reject the move
-                    currentSolution = tempSolution;
-                    rejectedMoves++;
-                    noImprovementCount++;
+                    
+                    totalIterations++;
+                } 
+                catch (const runtime_error& e) {
+                    if (string(e.what()).find("Timeout") != string::npos) {
+                        // Timeout detected during perturbation or packing
+                        return bestSolution;
+                    } else {
+                        // Re-throw other runtime errors
+                        throw;
+                    }
                 }
-                
-                totalIterations++;
             }
             
-            // Break from the outer loop too if timeout occurred
+            // Check for timeout after a temperature cycle
             if (checkTimeout()) {
-                break;
+                cout << "Timeout detected after completing temperature " << temperature << "." << endl;
+                return bestSolution;
             }
             
             // Cool down
@@ -358,16 +379,15 @@ shared_ptr<HBStarTree> SimulatedAnnealing::run() {
                     << ", No improvement: " << noImprovementCount 
                     << endl;
         }
+        
+        // Return the best solution found
+        return bestSolution;
     }
     catch (const exception& e) {
-        cout << "Exception during SA: " << e.what() << endl;
+        cout << "Exception in SA::run(): " << e.what() << endl;
         cout << "Returning best solution found so far." << endl;
+        return bestSolution;
     }
-    
-    // Make sure the best solution is packed
-    bestSolution->pack();
-    
-    return bestSolution;
 }
 
 
