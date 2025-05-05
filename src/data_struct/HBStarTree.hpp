@@ -56,7 +56,6 @@ private:
     
     // Internal helper methods
     void updateContourNodes();
-    void handleDanglingNodes();
     bool validateSymmetryIslandPlacement() const;
     shared_ptr<HBStarTreeNode> findNearestContourNode(shared_ptr<HBStarTreeNode> node) const;
     shared_ptr<HBStarTreeNode> findLeftmostSkewedChild(shared_ptr<HBStarTreeNode> node) const;

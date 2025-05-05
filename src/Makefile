@@ -1,6 +1,6 @@
 CXX      := g++
 CXXFLAGS := -std=c++17 -O3 -Wall -Wextra -MMD
-LIBS     := -lm
+LIBS     := -lm -pthread
 EXEC     := ../bin/hw4
 SRC_DIRS := .\
             parser\

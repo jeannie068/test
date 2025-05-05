@@ -89,7 +89,7 @@ int main(int argc, char* argv[]) {
     
     // Create the timeout manager with emergency shutdown after 10 seconds
     // Main timeout is set to 290 seconds (4m 50s)
-    auto timeoutManager = make_shared<TimeoutManager>(290, 10);
+    auto timeoutManager = make_shared<TimeoutManager>(240, 10);
     
     // Set a custom emergency callback that writes the output before exiting
     timeoutManager->setEmergencyCallback([&]() {
