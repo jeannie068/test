@@ -44,7 +44,9 @@ public:
     }
 
     void startWatchdog() {
+        // Reset the start time when the watchdog is started
         startTime = std::chrono::steady_clock::now();
+        timeoutOccurred = false;  // Also reset the timeout flag
         
         watchdogThread = std::thread([this]() {
             while (!timeoutOccurred) {
@@ -73,6 +75,7 @@ public:
             }
         });
     }
+
 
     bool hasTimedOut() const {
         return timeoutOccurred;
